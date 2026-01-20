@@ -1,4 +1,5 @@
 #include "Device.h"
+#include <vulkan/vulkan.h>
 #include <vector>
 #include <stdexcept>
 
@@ -25,7 +26,7 @@ Device::Device(VkInstance instance, VkSurfaceKHR surface) {
     qci.pQueuePriorities = &prio;
 
     const char* exts[] = { 
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         "VK_KHR_portability_subset"
     };
 
