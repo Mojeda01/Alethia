@@ -43,9 +43,6 @@ RenderPass::RenderPass(VkDevice dev, VkFormat colorFormat) : device(dev) {
 }
 
 RenderPass::~RenderPass() {
-    if (renderPass) {
-        vkDestroyRenderPass(device, renderPass, nullptr);
-    }
     destroy();
 }
 

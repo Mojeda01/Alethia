@@ -20,5 +20,6 @@ add_executable(VulkanLab
     src/CommandPool.cpp
     src/SyncObjects.cpp
     src/SwapchainBundle.cpp
+    src/FrameSync.cpp
 )
 target_link_libraries(VulkanLab PRIVATE Vulkan::Vulkan glfw)

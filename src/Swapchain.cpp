@@ -80,12 +80,6 @@ Swapchain::Swapchain(VkPhysicalDevice phys,
 }
 
 Swapchain::~Swapchain() {
-    for (auto v : views) {
-        vkDestroyImageView(device, v, nullptr);
-    }
-    if (swapchain) {
-        vkDestroySwapchainKHR(device, swapchain, nullptr);
-    }
     destroy();
 }
 

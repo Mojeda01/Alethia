@@ -28,9 +28,6 @@ FramebufferSet::FramebufferSet(VkDevice dev,
 }
 
 FramebufferSet::~FramebufferSet() {
-    for (auto fb : framebuffers) {
-        vkDestroyFramebuffer(device, fb, nullptr);
-    }
     destroy();
 }
 
