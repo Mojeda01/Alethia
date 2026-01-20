@@ -16,7 +16,7 @@ public:
     void advanceFrame();
 
     void waitForImage(uint32_t imageIndex);
-    void markImageInFlight();
+    void markImageInFlight(uint32_t imageIndex);
 private:
     VkDevice device;
     uint32_t maxFrames;
