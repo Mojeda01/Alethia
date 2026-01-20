@@ -107,7 +107,7 @@ Swapchain::Swapchain(Swapchain&& o) noexcept
         format(o.format),
         swapExtent(o.swapExtent),
         images(std::move(o.images)),
-        views(std::move(o.images)) {
+        views(std::move(o.views)) {
     o.device = VK_NULL_HANDLE;
     o.swapchain = VK_NULL_HANDLE;
 }

@@ -56,7 +56,7 @@ void RenderPass::destroy() noexcept {
     renderPass = VK_NULL_HANDLE;
 }
 
-RenderPass:RenderPass(RenderPass&& o) noexcept : device(o.device),
+RenderPass::RenderPass(RenderPass&& o) noexcept : device(o.device),
     renderPass(o.renderPass) {
     o.device = VK_NULL_HANDLE;
     o.renderPass = VK_NULL_HANDLE;

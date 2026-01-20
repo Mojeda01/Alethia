@@ -21,8 +21,6 @@ void SwapchainBundle::recreate(VkPhysicalDevice phys,
                                 uint32_t width,
                                 uint32_t height)
 {
-    // rely on RAII destructors of members
-    *this = SwapchainBundle(phys, device, surface, width, height);
     SwapchainBundle tmp(phys, device, surface, width, height);
     *this = std::move(tmp);
 }

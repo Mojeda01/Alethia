@@ -6,7 +6,7 @@ public:
     RenderPass(VkDevice device, VkFormat colorFormat);
     ~RenderPass();
     RenderPass(const RenderPass&) = delete;
-    RenderPass operator=(const RenderPass&) = delete;
+    RenderPass& operator=(const RenderPass&) = delete;
     RenderPass(RenderPass&&) noexcept;
     RenderPass& operator=(RenderPass&&) noexcept;
 

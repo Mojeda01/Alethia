@@ -44,7 +44,7 @@ void FramebufferSet::destroy() noexcept {
 }
 
 FramebufferSet::FramebufferSet(FramebufferSet&& o) noexcept
-    : device(o.device), framebuffer(std::move(o.framebuffers)) {
+    : device(o.device), framebuffers(std::move(o.framebuffers)) {
     o.device = VK_NULL_HANDLE;
 }
 
