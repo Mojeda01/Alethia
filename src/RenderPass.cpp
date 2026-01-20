@@ -1,5 +1,6 @@
 #include "RenderPass.h"
 #include <stdexcept>
+#include <utility>
 
 RenderPass::RenderPass(VkDevice dev, VkFormat colorFormat) : device(dev) {
     VkAttachmentDescription color{};
@@ -45,6 +46,30 @@ RenderPass::~RenderPass() {
     if (renderPass) {
         vkDestroyRenderPass(device, renderPass, nullptr);
     }
+    destroy();
+}
+
+void RenderPass::destroy() noexcept {
+    if (device != VK_NULL_HANDLE && renderPass) {
+        vkDestroyRenderPass(device, renderPass, nullptr);
+    }
+    renderPass = VK_NULL_HANDLE;
+}
+
+RenderPass:RenderPass(RenderPass&& o) noexcept : device(o.device),
+    renderPass(o.renderPass) {
+    o.device = VK_NULL_HANDLE;
+    o.renderPass = VK_NULL_HANDLE;
+}
+
+RenderPass& RenderPass::operator=(RenderPass&& o) noexcept {
+    if (this == &o) return *this;
+    destroy();
+    device = o.device;
+    renderPass = o.renderPass;
+    o.device = VK_NULL_HANDLE;
+    o.renderPass = VK_NULL_HANDLE;
+    return *this;
 }
 
 VkRenderPass RenderPass::get() const {

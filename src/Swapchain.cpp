@@ -1,6 +1,7 @@
 #include "Swapchain.h"
 #include <stdexcept>
 #include <algorithm>
+#include <utility>
 
 Swapchain::Swapchain(VkPhysicalDevice phys,
         VkDevice dev,
@@ -85,6 +86,44 @@ Swapchain::~Swapchain() {
     if (swapchain) {
         vkDestroySwapchainKHR(device, swapchain, nullptr);
     }
+    destroy();
+}
+
+void Swapchain::destroy() noexcept {
+    if (device != VK_NULL_HANDLE) {
+        for (auto v : views) {
+            if (v) vkDestroyImageView(device, v, nullptr);
+        }
+        if (swapchain) vkDestroySwapchainKHR(device, swapchain, nullptr);
+    }
+    views.clear();
+    images.clear();
+    swapchain = VK_NULL_HANDLE;
+}
+
+Swapchain::Swapchain(Swapchain&& o) noexcept 
+    :   device(o.device),
+        swapchain(o.swapchain),
+        format(o.format),
+        swapExtent(o.swapExtent),
+        images(std::move(o.images)),
+        views(std::move(o.images)) {
+    o.device = VK_NULL_HANDLE;
+    o.swapchain = VK_NULL_HANDLE;
+}
+
+Swapchain& Swapchain::operator=(Swapchain&& o) noexcept {
+    if (this == &o) return *this;
+    destroy();
+    device = o.device;
+    swapchain = o.swapchain;
+    format = o.format;
+    swapExtent = o.swapExtent;
+    images = std::move(o.images);
+    views = std::move(o.views);
+    o.device = VK_NULL_HANDLE;
+    o.swapchain = VK_NULL_HANDLE;
+    return *this;
 }
 
 VkSwapchainKHR Swapchain::get() const { return swapchain; }

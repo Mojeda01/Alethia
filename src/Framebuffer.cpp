@@ -1,5 +1,6 @@
 #include "Framebuffer.h"
 #include <stdexcept>
+#include <utility>
 
 FramebufferSet::FramebufferSet(VkDevice dev,
                                 VkRenderPass renderPass,
@@ -30,6 +31,30 @@ FramebufferSet::~FramebufferSet() {
     for (auto fb : framebuffers) {
         vkDestroyFramebuffer(device, fb, nullptr);
     }
+    destroy();
+}
+
+void FramebufferSet::destroy() noexcept {
+    if (device != VK_NULL_HANDLE) {
+        for (auto fb : framebuffers) {
+            if (fb) vkDestroyFramebuffer(device, fb, nullptr);
+        }
+    }
+    framebuffers.clear();
+}
+
+FramebufferSet::FramebufferSet(FramebufferSet&& o) noexcept
+    : device(o.device), framebuffer(std::move(o.framebuffers)) {
+    o.device = VK_NULL_HANDLE;
+}
+
+FramebufferSet& FramebufferSet::operator=(FramebufferSet&& o) noexcept {
+    if (this == &o) return *this;
+    destroy();
+    device = o.device;
+    framebuffers = std::move(o.framebuffers);
+    o.device = VK_NULL_HANDLE;
+    return *this;
 }
 
 const std::vector<VkFramebuffer>& FramebufferSet::get() const {

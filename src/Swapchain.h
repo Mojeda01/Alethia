@@ -11,6 +11,10 @@ public:
             uint32_t height);
 
     ~Swapchain();
+    Swapchain(const Swapchain&) = delete;
+    Swapchain& operator=(const Swapchain&) = delete;
+    Swapchain(Swapchain&&) noexcept;
+    Swapchain& operator=(Swapchain&&) noexcept;
 
     VkSwapchainKHR get() const;
     VkFormat imageFormat() const;
@@ -18,6 +22,7 @@ public:
     const std::vector<VkImageView>& imageViews() const;
 
 private:
+    void destroy() noexcept;
     VkDevice device;
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 

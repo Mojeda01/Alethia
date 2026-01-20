@@ -1,4 +1,5 @@
 #include "SwapchainBundle.h"
+#include <utility>
 
 SwapchainBundle::SwapchainBundle(   VkPhysicalDevice phys,
                                     VkDevice device,
@@ -22,6 +23,8 @@ void SwapchainBundle::recreate(VkPhysicalDevice phys,
 {
     // rely on RAII destructors of members
     *this = SwapchainBundle(phys, device, surface, width, height);
+    SwapchainBundle tmp(phys, device, surface, width, height);
+    *this = std::move(tmp);
 }
 
 VkRenderPass SwapchainBundle::renderPass() const {

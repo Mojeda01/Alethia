@@ -10,6 +10,10 @@ public:
                     VkSurfaceKHR surface,
                     uint32_t width,
                     uint32_t height);
+    SwapchainBundle(const SwapchainBundle&) = delete;
+    SwapchainBundle& operator=(const SwapchainBundle&) = delete;
+    SwapchainBundle(SwapchainBundle&&) noexcept = default;
+    SwapchainBundle operator=(SwapchainBundle&&) noexcept = default;
     void recreate(VkPhysicalDevice phys,
                   VkDevice device,
                   VkSurfaceKHR surface,

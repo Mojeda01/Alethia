@@ -80,6 +80,7 @@ void VulkanApp::drawFrame() {
     submit.pWaitDstStageMask = &waitStage;
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
+    submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &signalSem;
 
     if (vkQueueSubmit(device.graphicsQueue(), 1, &submit, frameFence) != VK_SUCCESS) {

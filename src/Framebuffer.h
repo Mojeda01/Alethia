@@ -9,8 +9,13 @@ public:
                     VkExtent2D extent,
                     const std::vector<VkImageView>& imageView);
     ~FramebufferSet();
+    FramebufferSet(const FramebufferSet&) = delete;
+    FramebufferSet& operator=(const FramebufferSet&) = delete;
+    FramebufferSet(FramebufferSet&&) noexcept;
+    FramebufferSet& operator=(FramebufferSet&&) noexcept;
     const std::vector<VkFramebuffer>& get() const;
 private:
+    void destroy() noexcept;
     VkDevice device;
     std::vector<VkFramebuffer> framebuffers;
 };
