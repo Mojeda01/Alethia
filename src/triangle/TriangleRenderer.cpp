@@ -9,8 +9,8 @@
 #include <vector>
 
 namespace{
-std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios:ate | std::ios::binary);
+std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) { 
+    std::ifstream file(path, std::ios::ate | std::ios::binary);
     if (!file) {
         throw std::runtime_error("Failed to open shader file: " + path.string());
     }
@@ -44,6 +44,7 @@ std::filesystem::path shaderPath(const char* file) {
 #else
     return std::filesystem::path(VULKANLAB_SHADER_DIR) / file;
 #endif
+}
 } // namespace
 
 TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev), renderPass(rp) {
@@ -71,12 +72,12 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
         VkPipelineShaderStageCreateInfo vertStage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT; 
         vertStage.module = tmpVert;
-        fragStage.pName = "main";
+        vertStage.pName = "main"; 
 
         VkPipelineShaderStageCreateInfo fragStage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         fragStage.module = tmpFrag;
-        vertStage.pName = "main";
+        fragStage.pName = "main"; 
 
         VkPipelineShaderStageCreateInfo stages[] = { vertStage, fragStage };
 
