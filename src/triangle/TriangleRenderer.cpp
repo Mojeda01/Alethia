@@ -69,7 +69,7 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
         }
 
         VkPipelineShaderStageCreateInfo vertStage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        vertStage.stage = VK_SHADER_VERTEX_BIT;
+        vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT; 
         vertStage.module = tmpVert;
         vertStage.pName = "main";
 
@@ -93,7 +93,7 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
     rs.polygonMode = VK_POLYGON_MODE_FILL;
     rs.cullMode = VK_CULL_MODE_NONE;
     rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rs.linewidth = 1.0f;
+    rs.lineWidth = 1.0f;
 
     VkPipelineMultisampleStateCreateInfo ms{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
     ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -104,7 +104,7 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
 
     VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
     cb.attachmentCount = 1;
-    cb.pAttachment = &cba;
+    cb.pAttachments = &cba;
 
     VkDynamics dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dyn{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
@@ -161,7 +161,7 @@ TriangleRenderer::~TriangleRenderer() {
 }
 
 VkShaderModule TriangleRenderer::createShaderModule(const void* bytes, size_t sizeBytes) const {
-    if (bytes == nullptr || sizeBytes == 0 || (sizebytes % 4) != 0) {
+    if (bytes == nullptr || sizeBytes == 0 || (sizeBytes % 4) != 0) {
         throw std::invalid_argument("Shader module bytes must be non-null and 4-byte aligned");
     }
 
@@ -193,7 +193,7 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
     VkClearValue clear{};
     clear.color = clearColor;
 
-    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_PASS_BEGIN_INFO };
+    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO };
     rp.renderPass = renderPass;
     rp.framebuffer = framebuffer;
     rp.renderArea.offset = { 0, 0 };
