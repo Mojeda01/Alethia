@@ -1,4 +1,6 @@
 #include "Swapchain.h"
+#include "SwapchainSelection.h"
+
 #include <stdexcept>
 #include <algorithm>
 #include <utility>
@@ -9,23 +11,42 @@ Swapchain::Swapchain(VkPhysicalDevice phys,
         uint32_t width,
         uint32_t height) 
     : device(dev) {
+    if (phys == VK_NULL_HANDLE || dev == VK_NULL_HANDLE || surface == VK_NULL_HANDLE) {
+        throw std::invalid_argument("Swapchain: invalid Vulkan handles");
+    }
 
-   VkSurfaceCapabilitiesKHR caps;
-   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys, surface, &caps);
+    VkSurfaceCapabilitiesKHR caps;
+    VkResult r = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys, surface, &caps);
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed");
+    }
 
-   uint32_t formatCount;
-   vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, nullptr);
-   std::vector<VkSurfaceFormatKHR> formats(formatCount);
-   vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, formats.data());
+    uint32_t formatCount = 0;
+    r = vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, nullptr);
+    if (r != VK_SUCCESS || formatCount == 0) {
+        throw std::runtime_error("No surface formats available");
+    }
+    std::vector<VkSurfaceFormatKHR> formats(formatCount); 
+    r = vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, formats.data());
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetPhysicalDeviceSurfaceFormatsKHR failed");
+    }
 
-   uint32_t modeCount;
-   vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, nullptr);
-   std::vector<VkPresentModeKHR> modes(modeCount);
-   vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, modes.data());
+    uint32_t modeCount = 0;
+    r = vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, nullptr);
+    if (r != VK_SUCCESS || modeCount == 0) {
+        throw std::runtime_error("No present modes available");
+    }
 
-   auto surfaceFormat = chooseFormat(formats);
-   auto presentMode = choosePresentMode(modes);
-   auto extent = chooseExtent(caps, width, height);
+    std::vector<VkPresentModeKHR> modes(modeCount);
+    r = vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, modes.data());
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetPhysicalDeviceSurfacePresentModesKHR failed");
+    }
+
+    const VkSurfaceFormatKHR surfaceFormat = swapchain_select::chooseSurfaceFormat(formats);
+    const VkPresentModeKHR presentMode = swapchain_select::choosePresentMode(modes);
+    const VkExtent2D extent = swapchain_select::chooseExtent(caps, width, height);
 
    uint32_t imageCount = caps.minImageCount + 1;
    if (caps.maxImageCount > 0 && imageCount > caps.maxImageCount) {
@@ -46,18 +67,26 @@ Swapchain::Swapchain(VkPhysicalDevice phys,
     ci.presentMode = presentMode;
     ci.clipped = VK_TRUE;
 
-    if (vkCreateSwapchainKHR(device, &ci, nullptr, &swapchain) != VK_SUCCESS) {
+    r = vkCreateSwapchainKHR(device, &ci, nullptr, &swapchain);
+    if (r != VK_SUCCESS) {
         throw std::runtime_error("Swapchain creation failed");
     }
 
-    vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+    r = vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+    if (r != VK_SUCCESS || imageCount == 0) {
+        throw std::runtime_error("vkGetSwapchainImagesKHR (count) failed");
+    }
+
     images.resize(imageCount);
-    vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images.data());
+    r = vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images.data());
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetSwapchainImagesKHR failed");
+    }
 
     format = surfaceFormat.format;
     swapExtent = extent;
+    views.resize(images.size(), VK_NULL_HANDLE);
 
-    views.resize(images.size());
     for (size_t i = 0; i < images.size(); ++i){
         VkImageViewCreateInfo iv{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
         iv.image = images[i];
