@@ -154,33 +154,4 @@ VkFormat Swapchain::imageFormat() const { return format; }
 VkExtent2D Swapchain::extent() const { return swapExtent; }
 const std::vector<VkImageView>& Swapchain::imageViews() const { return views; }
 
-VkSurfaceFormatKHR Swapchain::chooseFormat(const std::vector<VkSurfaceFormatKHR>& format) {
-    for (const auto& f : format) {
-        if (f.format == VK_FORMAT_B8G8R8A8_UNORM && 
-            f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return f;
-        }
-    }
-    return format[0];
-}
 
-VkPresentModeKHR Swapchain::choosePresentMode(const std::vector<VkPresentModeKHR>& modes) {
-    for (auto m : modes) {
-        if (m == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return m;
-        }
-    }
-    return VK_PRESENT_MODE_FIFO_KHR;
-}
-
-VkExtent2D Swapchain::chooseExtent(const VkSurfaceCapabilitiesKHR& caps,
-                                    uint32_t width, uint32_t height) {
-    if (caps.currentExtent.width != UINT32_MAX) {
-        return caps.currentExtent;
-    }
-
-    VkExtent2D e;
-    e.width = std::clamp(width, caps.minImageExtent.width, caps.maxImageExtent.width);
-    e.height = std::clamp(height, caps.minImageExtent.height, caps.maxImageExtent.height);
-    return e;
-}
