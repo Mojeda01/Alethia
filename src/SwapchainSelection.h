@@ -40,7 +40,7 @@ inline VkExtent2D chooseExtent(const VkSurfaceCapabilitiesKHR& caps, uint32_t wi
     if (width == 0 || height == 0) {
         throw std::invalid_argument("Requested extent must be non-zero when currentExtent is undefined");
     }
-    VkExtent2D;
+    VkExtent2D e{};
     e.width = std::clamp(width, caps.minImageExtent.width, caps.maxImageExtent.width);
     e.height = std::clamp(height, caps.minImageExtent.height, caps.maxImageExtent.height);
     return e;

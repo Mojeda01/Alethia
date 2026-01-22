@@ -9,6 +9,7 @@
 #include "CommandPool.h"
 #include "SwapchainBundle.h"
 #include "FrameSync.h"
+#include "triangle/TriangleRenderer.h"
 
 class VulkanApp{
 public:
@@ -28,6 +29,7 @@ private:
     Surface surface;
     Device device;
     SwapchainBundle swapchainBundle;
+    TriangleRenderer triangle;
     CommandPool commandPool;
     FrameSync sync;
 };

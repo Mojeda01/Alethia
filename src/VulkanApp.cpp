@@ -12,10 +12,12 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                         surface.get(),
                         (uint32_t)width,
                         (uint32_t)height)
+    , triangle(device.get(), swapchainBundle.renderPass())
     , commandPool(  device.get(),
                     device.graphicsQueueFamily(),
                     swapchainBundle.framebuffers().size())
-    , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(), MAX_FRAMES_IN_FLIGHT)
+    , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
+            (uint32_t)swapchainBundle.framebuffers().size()) 
 {
     std::cout << "Vulkan fully initialized\n";
 }
@@ -107,25 +109,6 @@ void VulkanApp::drawFrame() {
 }
 
 void VulkanApp::recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
-    VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    if (vkBeginCommandBuffer(cmd, &bi) != VK_SUCCESS) {
-        throw std::runtime_error("vkBeginCommandBuffer failed");
-    }
-    VkClearValue clear{};
-    clear.color = { { 0.05f, 0.05f, 0.05f, 1.0f } };
-
-    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    rp.renderPass = swapchainBundle.renderPass();
-    rp.framebuffer = swapchainBundle.framebuffers()[imageIndex];
-    rp.renderArea.offset = { 0,0 };
-    rp.renderArea.extent = swapchainBundle.extent();
-    rp.clearValueCount = 1;
-    rp.pClearValues = &clear;
-
-    vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdEndRenderPass(cmd);
-
-    if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
-        throw std::runtime_error("vkEndCommandBuffer failed");
-    }
+    triangle.record(cmd, swapchainBundle.framebuffers()[imageIndex],
+                    swapchainBundle.extent());
 }
