@@ -10,7 +10,7 @@
 
 namespace{
 std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios:ate || std::ios::binary);
+    std::ifstream file(path, std::ios:ate | std::ios::binary);
     if (!file) {
         throw std::runtime_error("Failed to open shader file: " + path.string());
     }
@@ -37,7 +37,7 @@ std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) {
 }
 
 std::filesystem::path shaderPath(const char* file) {
-#ifndef VULKAN_LAB_SHADER_DIR
+#ifndef VULKANLAB_SHADER_DIR
     (void)file;
     throw std::runtime_error("VULKANLAB_SHADER_DIR is not defined; shaders cannot be located");
 }
@@ -71,7 +71,7 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
         VkPipelineShaderStageCreateInfo vertStage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT; 
         vertStage.module = tmpVert;
-        vertStage.pName = "main";
+        fragStage.pName = "main";
 
         VkPipelineShaderStageCreateInfo fragStage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -106,7 +106,7 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
     cb.attachmentCount = 1;
     cb.pAttachments = &cba;
 
-    VkDynamics dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR }; 
     VkPipelineDynamicStateCreateInfo dyn{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
     dyn.dynamicStateCount = static_cast<uint32_t>(sizeof(dynStates) / sizeof(dynStates[0]));
     dyn.pDynamicStates = dynStates;
@@ -167,7 +167,7 @@ VkShaderModule TriangleRenderer::createShaderModule(const void* bytes, size_t si
 
     VkShaderModuleCreateInfo ci{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     ci.codeSize = sizeBytes;
-    ci.pCode = reinterpret_cast<const uint32_t>*(bytes);
+    ci.pCode = reinterpret_cast<const uint32_t*>(bytes); 
 
     VkShaderModule mod = VK_NULL_HANDLE;
     if (vkCreateShaderModule(device, &ci, nullptr, &mod) != VK_SUCCESS) {
@@ -193,13 +193,16 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
     VkClearValue clear{};
     clear.color = clearColor;
 
-    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO };
+    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO }; 
     rp.renderPass = renderPass;
     rp.framebuffer = framebuffer;
     rp.renderArea.offset = { 0, 0 };
     rp.renderArea.extent = extent;
     rp.clearValueCount = 1;
     rp.pClearValues = &clear;
+
+    vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
