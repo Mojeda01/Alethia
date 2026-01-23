@@ -23,6 +23,7 @@ private:
     void drawFrame();
     void recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex);
     void recreateSwapchain();
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 private:
     Window window;
     Instance instance;
@@ -32,4 +33,5 @@ private:
     TriangleRenderer triangle;
     CommandPool commandPool;
     FrameSync sync;
+    bool framebufferResized = false;
 };

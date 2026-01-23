@@ -146,7 +146,7 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
     }
 }
 
-TriangleRenderer::~TriangleRenderer() {
+void TriangleRenderer::destroy() noexcept{
     if (device != VK_NULL_HANDLE) {
         if (pipeline) vkDestroyPipeline(device, pipeline, nullptr);
         if (pipelineLayout) vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -159,6 +159,43 @@ TriangleRenderer::~TriangleRenderer() {
     fragModule = VK_NULL_HANDLE;
     renderPass = VK_NULL_HANDLE;
     device = VK_NULL_HANDLE;
+}
+
+TriangleRenderer::TriangleRenderer(TriangleRenderer&& o) noexcept
+        :   device(o.device),
+            renderPass(o.renderPass),
+            pipelineLayout(o.pipelineLayout),
+            pipeline(o.pipeline),
+            vertModule(o.vertModule),
+            fragModule(o.fragModule){
+    o.device = VK_NULL_HANDLE;
+    o.renderPass = VK_NULL_HANDLE;
+    o.pipelineLayout = VK_NULL_HANDLE;
+    o.pipeline = VK_NULL_HANDLE;
+    o.vertModule = VK_NULL_HANDLE;
+    o.fragModule = VK_NULL_HANDLE;
+}
+
+TriangleRenderer& TriangleRenderer::operator=(TriangleRenderer&& o) noexcept {
+    if (this == &o) return *this;
+    destroy();
+    device = o.device;
+    renderPass = o.renderPass;
+    pipelineLayout = o.pipelineLayout;
+    pipeline = o.pipeline;
+    vertModule = o.vertModule;
+    fragModule = o.fragModule;
+    o.device = VK_NULL_HANDLE;
+    o.renderPass = VK_NULL_HANDLE;
+    o.pipelineLayout = VK_NULL_HANDLE;
+    o.pipeline = VK_NULL_HANDLE;
+    o.vertModule = VK_NULL_HANDLE;
+    o.fragModule = VK_NULL_HANDLE;
+    return *this;
+}
+
+TriangleRenderer::~TriangleRenderer() {
+    destroy();
 }
 
 VkShaderModule TriangleRenderer::createShaderModule(const void* bytes, size_t sizeBytes) const {

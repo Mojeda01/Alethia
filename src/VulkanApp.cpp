@@ -19,6 +19,8 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size()) 
 {
+    glfwSetWindowUserPointer(window.get(), this);
+    glfwSetFramebufferSizeCallback(window.get(), VulkanApp::framebufferResizeCallback);
     std::cout << "Vulkan fully initialized\n";
 }
 
@@ -34,8 +36,21 @@ void VulkanApp::cleanup() {
     // nothing yet.
 }
 
+void VulkanApp::framebufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/) {
+    auto* app = reinterpret_cast<VulkanApp*>(glfwGetWindowUserPointer(window));
+    if (app) {
+        app->framebufferResized = true;
+    }
+}
+
 void VulkanApp::drawFrame() {
     VkDevice dev = device.get();
+
+    if (framebufferResized) {
+        framebufferResized = false;
+        recreateSwapchain();
+        return;
+    }
 
     // wait for the CPU/GPU sync fence for this frame
     VkFence frameFence = sync.inFlightFence();
@@ -51,8 +66,9 @@ void VulkanApp::drawFrame() {
         VK_NULL_HANDLE,
         &imageIndex
     );
+    bool suboptimal = (r == VK_SUBOPTIMAL_KHR);
     if (r == VK_ERROR_OUT_OF_DATE_KHR) {
-        // recreateSwapchain();
+        recreateSwapchain();
         return;
     } 
     if (r != VK_SUCCESS && r != VK_SUBOPTIMAL_KHR) {
@@ -99,8 +115,10 @@ void VulkanApp::drawFrame() {
     present.pImageIndices = &imageIndex;
 
     r = vkQueuePresentKHR(device.presentQueue(), &present);
-    if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR) {
-        // recreateSwapchain();
+    if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR || framebufferResized || suboptimal) {
+        framebufferResized = false;
+        recreateSwapchain();
+        return;
     } else if (r != VK_SUCCESS) {
         throw std::runtime_error("vkQueuePresentKHR failed");
     }
@@ -111,4 +129,22 @@ void VulkanApp::drawFrame() {
 void VulkanApp::recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
     triangle.record(cmd, swapchainBundle.framebuffers()[imageIndex],
                     swapchainBundle.extent());
+}
+
+void VulkanApp::recreateSwapchain() {
+    auto fb = window.framebufferSize();
+    while (fb.first == 0 || fb.second == 0) {
+        window.pollEvents();
+        fb = window.framebufferSize();
+    }
+
+    vkDeviceWaitIdle(device.get());
+
+    swapchainBundle.recreate(
+        device.physical(),
+        device.get(),
+        surface.get(),
+        static_cast<uint32_t>(fb.first),
+        static_cast<uint32_t>(fb.second)
+    );
 }
