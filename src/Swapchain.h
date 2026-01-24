@@ -11,6 +11,10 @@ public:
             uint32_t height);
 
     ~Swapchain();
+    Swapchain(const Swapchain&) = delete;
+    Swapchain& operator=(const Swapchain&) = delete;
+    Swapchain(Swapchain&&) noexcept;
+    Swapchain& operator=(Swapchain&&) noexcept;
 
     VkSwapchainKHR get() const;
     VkFormat imageFormat() const;
@@ -18,17 +22,15 @@ public:
     const std::vector<VkImageView>& imageViews() const;
 
 private:
-    VkDevice device;
+    void destroy() noexcept;
+
+    VkDevice device = VK_NULL_HANDLE;
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
-    VkFormat format;
-    VkExtent2D swapExtent;
+    VkFormat format = VK_FORMAT_UNDEFINED;
+    VkExtent2D swapExtent{};
 
     std::vector<VkImage> images;
     std::vector<VkImageView> views;
-
-    VkSurfaceFormatKHR chooseFormat(const std::vector<VkSurfaceFormatKHR>& formats);
-    VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& modes);
-    VkExtent2D chooseExtent(const VkSurfaceCapabilitiesKHR& caps,
-                                uint32_t width, uint32_t height);
+    
 };

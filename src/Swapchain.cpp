@@ -1,6 +1,9 @@
 #include "Swapchain.h"
+#include "SwapchainSelection.h"
+
 #include <stdexcept>
 #include <algorithm>
+#include <utility>
 
 Swapchain::Swapchain(VkPhysicalDevice phys,
         VkDevice dev,
@@ -8,23 +11,42 @@ Swapchain::Swapchain(VkPhysicalDevice phys,
         uint32_t width,
         uint32_t height) 
     : device(dev) {
+    if (phys == VK_NULL_HANDLE || dev == VK_NULL_HANDLE || surface == VK_NULL_HANDLE) {
+        throw std::invalid_argument("Swapchain: invalid Vulkan handles");
+    }
 
-   VkSurfaceCapabilitiesKHR caps;
-   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys, surface, &caps);
+    VkSurfaceCapabilitiesKHR caps;
+    VkResult r = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys, surface, &caps);
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed");
+    }
 
-   uint32_t formatCount;
-   vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, nullptr);
-   std::vector<VkSurfaceFormatKHR> formats(formatCount);
-   vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, formats.data());
+    uint32_t formatCount = 0;
+    r = vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, nullptr);
+    if (r != VK_SUCCESS || formatCount == 0) {
+        throw std::runtime_error("No surface formats available");
+    }
+    std::vector<VkSurfaceFormatKHR> formats(formatCount); 
+    r = vkGetPhysicalDeviceSurfaceFormatsKHR(phys, surface, &formatCount, formats.data());
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetPhysicalDeviceSurfaceFormatsKHR failed");
+    }
 
-   uint32_t modeCount;
-   vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, nullptr);
-   std::vector<VkPresentModeKHR> modes(modeCount);
-   vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, modes.data());
+    uint32_t modeCount = 0;
+    r = vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, nullptr);
+    if (r != VK_SUCCESS || modeCount == 0) {
+        throw std::runtime_error("No present modes available");
+    }
 
-   auto surfaceFormat = chooseFormat(formats);
-   auto presentMode = choosePresentMode(modes);
-   auto extent = chooseExtent(caps, width, height);
+    std::vector<VkPresentModeKHR> modes(modeCount);
+    r = vkGetPhysicalDeviceSurfacePresentModesKHR(phys, surface, &modeCount, modes.data());
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetPhysicalDeviceSurfacePresentModesKHR failed");
+    }
+
+    const VkSurfaceFormatKHR surfaceFormat = swapchain_select::chooseSurfaceFormat(formats);
+    const VkPresentModeKHR presentMode = swapchain_select::choosePresentMode(modes);
+    const VkExtent2D extent = swapchain_select::chooseExtent(caps, width, height);
 
    uint32_t imageCount = caps.minImageCount + 1;
    if (caps.maxImageCount > 0 && imageCount > caps.maxImageCount) {
@@ -45,18 +67,26 @@ Swapchain::Swapchain(VkPhysicalDevice phys,
     ci.presentMode = presentMode;
     ci.clipped = VK_TRUE;
 
-    if (vkCreateSwapchainKHR(device, &ci, nullptr, &swapchain) != VK_SUCCESS) {
+    r = vkCreateSwapchainKHR(device, &ci, nullptr, &swapchain);
+    if (r != VK_SUCCESS) {
         throw std::runtime_error("Swapchain creation failed");
     }
 
-    vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+    r = vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+    if (r != VK_SUCCESS || imageCount == 0) {
+        throw std::runtime_error("vkGetSwapchainImagesKHR (count) failed");
+    }
+
     images.resize(imageCount);
-    vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images.data());
+    r = vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images.data());
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("vkGetSwapchainImagesKHR failed");
+    }
 
     format = surfaceFormat.format;
     swapExtent = extent;
+    views.resize(images.size(), VK_NULL_HANDLE);
 
-    views.resize(images.size());
     for (size_t i = 0; i < images.size(); ++i){
         VkImageViewCreateInfo iv{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
         iv.image = images[i];
@@ -79,12 +109,44 @@ Swapchain::Swapchain(VkPhysicalDevice phys,
 }
 
 Swapchain::~Swapchain() {
-    for (auto v : views) {
-        vkDestroyImageView(device, v, nullptr);
+    destroy();
+}
+
+void Swapchain::destroy() noexcept {
+    if (device != VK_NULL_HANDLE) {
+        for (auto v : views) {
+            if (v) vkDestroyImageView(device, v, nullptr);
+        }
+        if (swapchain) vkDestroySwapchainKHR(device, swapchain, nullptr);
     }
-    if (swapchain) {
-        vkDestroySwapchainKHR(device, swapchain, nullptr);
-    }
+    views.clear();
+    images.clear();
+    swapchain = VK_NULL_HANDLE;
+}
+
+Swapchain::Swapchain(Swapchain&& o) noexcept 
+    :   device(o.device),
+        swapchain(o.swapchain),
+        format(o.format),
+        swapExtent(o.swapExtent),
+        images(std::move(o.images)),
+        views(std::move(o.views)) {
+    o.device = VK_NULL_HANDLE;
+    o.swapchain = VK_NULL_HANDLE;
+}
+
+Swapchain& Swapchain::operator=(Swapchain&& o) noexcept {
+    if (this == &o) return *this;
+    destroy();
+    device = o.device;
+    swapchain = o.swapchain;
+    format = o.format;
+    swapExtent = o.swapExtent;
+    images = std::move(o.images);
+    views = std::move(o.views);
+    o.device = VK_NULL_HANDLE;
+    o.swapchain = VK_NULL_HANDLE;
+    return *this;
 }
 
 VkSwapchainKHR Swapchain::get() const { return swapchain; }
@@ -92,33 +154,4 @@ VkFormat Swapchain::imageFormat() const { return format; }
 VkExtent2D Swapchain::extent() const { return swapExtent; }
 const std::vector<VkImageView>& Swapchain::imageViews() const { return views; }
 
-VkSurfaceFormatKHR Swapchain::chooseFormat(const std::vector<VkSurfaceFormatKHR>& format) {
-    for (const auto& f : format) {
-        if (f.format == VK_FORMAT_B8G8R8A8_UNORM && 
-            f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return f;
-        }
-    }
-    return format[0];
-}
 
-VkPresentModeKHR Swapchain::choosePresentMode(const std::vector<VkPresentModeKHR>& modes) {
-    for (auto m : modes) {
-        if (m == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return m;
-        }
-    }
-    return VK_PRESENT_MODE_FIFO_KHR;
-}
-
-VkExtent2D Swapchain::chooseExtent(const VkSurfaceCapabilitiesKHR& caps,
-                                    uint32_t width, uint32_t height) {
-    if (caps.currentExtent.width != UINT32_MAX) {
-        return caps.currentExtent;
-    }
-
-    VkExtent2D e;
-    e.width = std::clamp(width, caps.minImageExtent.width, caps.maxImageExtent.width);
-    e.height = std::clamp(height, caps.minImageExtent.height, caps.maxImageExtent.height);
-    return e;
-}
