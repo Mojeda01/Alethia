@@ -15,7 +15,7 @@ public:
     const std::vector<VkCommandBuffer>& buffers() const;
     std::vector<VkCommandBuffer> allocate(uint32_t count); // allocating command buffers.
 private:
-    void destroy();
+    void destroy() noexcept;
     VkDevice device;
     VkCommandPool pool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers;
