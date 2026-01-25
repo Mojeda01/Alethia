@@ -11,6 +11,9 @@
 #include "FrameSync.h"
 #include "triangle/TriangleRenderer.h"
 
+#include <chrono>
+#include <cstdint>
+
 class VulkanApp{
 public:
     VulkanApp(int width, int height, const char* title);
@@ -21,7 +24,7 @@ private:
     void initVulkan(int width, int height);
     void cleanup();
     void drawFrame();
-    void recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex);
+    void recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants);
     void recreateSwapchain();
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 private:
@@ -33,5 +36,8 @@ private:
     TriangleRenderer triangle;
     CommandPool commandPool;
     FrameSync sync;
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point lastFrameTime;
+    std::uint32_t frameIndex = 0;
     bool framebufferResized = false;
 };

@@ -21,6 +21,10 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 {
     glfwSetWindowUserPointer(window.get(), this);
     glfwSetFramebufferSizeCallback(window.get(), VulkanApp::framebufferResizeCallback);
+
+    auto now = std::chrono::steady_clock::now();
+    startTime = now;
+    lastFrameTime = now;
     std::cout << "Vulkan fully initialized\n";
 }
 
@@ -85,7 +89,18 @@ void VulkanApp::drawFrame() {
     // record clear-only render pass into the command buffer.
     VkCommandBuffer cmd = commandPool.buffers()[imageIndex];
     vkResetCommandBuffer(cmd, 0);
-    recordClearCommandBuffer(cmd, imageIndex);
+    
+    auto now = std::chrono::steady_clock::now();
+    float timeSeconds = std::chrono::duration<float>(now - startTime).count();
+    float deltaSeconds = std::chrono::duration<float>(now - lastFrameTime).count();
+    lastFrameTime = now;
+
+    TriangleRenderer::PushConstants pushConstants{};
+    pushConstants.timeSeconds = timeSeconds;
+    pushConstants.deltaSeconds = deltaSeconds;
+    pushConstants.frameIndex = frameIndex++;
+
+    recordClearCommandBuffer(cmd, imageIndex, pushConstants);
 
     // submit
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -126,9 +141,10 @@ void VulkanApp::drawFrame() {
     sync.advanceFrame();
 }
 
-void VulkanApp::recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
+void VulkanApp::recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants) {
     triangle.record(cmd, swapchainBundle.framebuffers()[imageIndex],
-                    swapchainBundle.extent());
+                    swapchainBundle.extent(),
+                    pushConstants);
 }
 
 void VulkanApp::recreateSwapchain() {

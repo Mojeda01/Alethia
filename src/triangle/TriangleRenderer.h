@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include <cstddef>
+#include <cstdint>
 
 class TriangleRenderer {
 public:
@@ -12,11 +13,24 @@ public:
     TriangleRenderer& operator=(const TriangleRenderer&) = delete;
     TriangleRenderer(TriangleRenderer&&) noexcept;
     TriangleRenderer& operator=(TriangleRenderer&&) noexcept;
+    struct PushConstants{
+        float timeSeconds = 0.0f;
+        float deltaSeconds = 0.0f;
+        std::uint32_t frameIndex = 0;
+        float pad = 0.0f;
+    };
 
     void record(    VkCommandBuffer cmd,
                     VkFramebuffer framebuffer,
                     VkExtent2D extent,
                     VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
+
+    void record(    VkCommandBuffer cmd,
+                    VkFramebuffer framebuffer,
+                    VkExtent2D extent,
+                    const PushConstants& pushConstants,
+                    VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
+
 private:
     VkShaderModule createShaderModule(const void* bytes, size_t sizeBytes) const;
 private:

@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <vector>
 
+static_assert(sizeof(TriangleRenderer::PushConstants) == 16, "Push constants must be 16 bytes");
+
 namespace{
 std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) { 
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -65,6 +67,13 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
         tmpFrag = createShaderModule(fragWords.data(), fragWords.size() * sizeof(std::uint32_t));
 
         VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        VkPushConstantRange pcr{};
+        pcr.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pcr.offset = 0;
+        pcr.size = sizeof(PushConstants);
+
+        pl.pushConstantRangeCount = 1;
+        pl.pPushConstantRanges = &pcr;
         if (vkCreatePipelineLayout(device, &pl, nullptr, &tmpLayout) != VK_SUCCESS) {
             throw std::runtime_error("vkCreatePipelineLayout failed");
         }
@@ -219,6 +228,15 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
                                 VkExtent2D extent,
                                 VkClearColorValue clearColor) const {
 
+    record(cmd, framebuffer, extent, PushConstants{}, clearColor);
+}
+
+void TriangleRenderer::record(  VkCommandBuffer cmd,
+                                VkFramebuffer framebuffer,
+                                VkExtent2D extent,
+                                const PushConstants& pushConstants,
+                                VkClearColorValue clearColor) const {
+
     if (cmd == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE) {
         throw std::invalid_argument("TriangleRenderer::record: invalid Vulkan handles");
     } 
@@ -241,6 +259,13 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
 
     vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    
+    vkCmdPushConstants( cmd,
+                        pipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                        0,
+                        sizeof(PushConstants),
+                        &pushConstants);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
