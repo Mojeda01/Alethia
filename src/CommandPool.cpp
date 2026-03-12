@@ -56,3 +56,18 @@ CommandPool::~CommandPool (){
 const std::vector<VkCommandBuffer>& CommandPool::buffers() const {
     return commandBuffers;
 }
+
+std::vector<VkCommandBuffer> CommandPool::allocate(uint32_t count) {
+    if (count == 0) {
+        throw std::invalid_argument("CommandPool::allocate: count must be greater than zero");
+    }
+    std::vector<VkCommandBuffer> buffers(count);
+    VkCommandBufferAllocateInfo ai{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    ai.commandPool = pool;
+    ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    ai.commandBufferCount = count;
+    if (vkAllocateCommandBuffers(device, &ai, buffers.data()) != VK_SUCCESS) {
+        throw std::runtime_error("CommandPool::allocate: vkAllocateCommandBuffers failed"); 
+    }
+    return buffers;
+}

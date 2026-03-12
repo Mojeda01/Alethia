@@ -12,6 +12,7 @@ public:
     CommandPool(CommandPool&&) noexcept;
     CommandPool& operator=(CommandPool&&) noexcept;
 
+    VkCommandPool get() const { return pool; }
     const std::vector<VkCommandBuffer>& buffers() const;
     std::vector<VkCommandBuffer> allocate(uint32_t count); // allocating command buffers.
 private:
