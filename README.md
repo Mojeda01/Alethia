@@ -8,7 +8,7 @@
 
 A custom Vulkan rendering engine built from scratch. GPU vertex buffers,
 depth testing, SPIR-V shader pipeline, swapchain management with resize
-handling. Working toward a first-person historical finance sim.
+handling. 
 
 ## Requirements
 
