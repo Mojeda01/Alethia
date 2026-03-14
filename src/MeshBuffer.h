@@ -14,7 +14,7 @@ public:
                 VkCommandPool commandPool,
                 VkQueue transferQueue,
                 const std::vector<Vertex>& vertices);
-    ~MeshBufffer();
+    ~MeshBuffer();
 
     MeshBuffer(const MeshBuffer&) = delete;
     MeshBuffer& operator=(const MeshBuffer&) = delete;

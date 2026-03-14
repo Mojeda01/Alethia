@@ -23,14 +23,11 @@ public:
     void record(    VkCommandBuffer cmd,
                     VkFramebuffer framebuffer,
                     VkExtent2D extent,
-                    VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
-
-    void record(    VkCommandBuffer cmd,
-                    VkFramebuffer framebuffer,
-                    VkExtent2D extent,
+                    VkBuffer vertexBuffer,
+                    uint32_t vertexCount,
                     const PushConstants& pushConstants,
                     VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
-
+ 
 private:
     VkShaderModule createShaderModule(const void* bytes, size_t sizeBytes) const;
 private:

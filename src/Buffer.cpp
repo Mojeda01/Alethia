@@ -32,6 +32,12 @@ Buffer::Buffer( VkDevice dev,
     ai.allocationSize = memReqs.size;
     ai.memoryTypeIndex = findMemoryType(physicalDevice, memReqs.memoryTypeBits, memoryProperties);
 
+    if (vkAllocateMemory(device, &ai, nullptr, &mem) != VK_SUCCESS) {
+        vkDestroyBuffer(device, buffer, nullptr);
+        buffer = VK_NULL_HANDLE;
+        throw std::runtime_error("vkAllocateMemory failed");
+    }
+
     if (vkBindBufferMemory(device, buffer, mem, 0) != VK_SUCCESS) {
         vkFreeMemory(device, mem, nullptr);
         vkDestroyBuffer(device, buffer, nullptr);

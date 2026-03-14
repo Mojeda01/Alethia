@@ -1,6 +1,16 @@
 #include "VulkanApp.h"
+#include "Vertex.h"
 #include <iostream>
 #include <stdexcept>
+#include <vector>
+
+static std::vector<Vertex> makeTriangleVertices() {
+    return {
+        { {  0.0f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+        { {  0.5f,  0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+        { { -0.5f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+    };
+}
 
 VulkanApp::VulkanApp(int width, int height, const char* title)
     : window(width, height, title)
@@ -16,6 +26,11 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     , commandPool(  device.get(),
                     device.graphicsQueueFamily(),
                     swapchainBundle.framebuffers().size())
+    , meshBuffer(   device.get(),
+                    device.physical(),
+                    commandPool.get(),
+                    device.graphicsQueue(),
+                    makeTriangleVertices())
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size()) 
 {
@@ -142,9 +157,11 @@ void VulkanApp::drawFrame() {
 }
 
 void VulkanApp::recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants) {
-    triangle.record(cmd, swapchainBundle.framebuffers()[imageIndex],
-                    swapchainBundle.extent(),
-                    pushConstants);
+    triangle.record(    cmd, swapchainBundle.framebuffers()[imageIndex],
+                        swapchainBundle.extent(),
+                        meshBuffer.vertexBuffer(),
+                        meshBuffer.vertexCount(),
+                        pushConstants); 
 }
 
 void VulkanApp::recreateSwapchain() {

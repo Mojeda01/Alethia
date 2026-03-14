@@ -64,6 +64,8 @@ add_executable(VulkanLab
     src/SyncObjects.cpp
     src/SwapchainBundle.cpp
     src/FrameSync.cpp
+    src/Buffer.cpp
+    src/MeshBuffer.cpp
 )
 
 add_dependencies(VulkanLab VulkanLabShaders)

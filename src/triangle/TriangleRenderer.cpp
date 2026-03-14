@@ -1,4 +1,5 @@
 #include "TriangleRenderer.h"
+#include "../Vertex.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -90,7 +91,14 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
 
         VkPipelineShaderStageCreateInfo stages[] = { vertStage, fragStage };
 
+        auto bindingDesc = Vertex::bindingDescription();
+        auto attribDescs = Vertex::attributeDescriptions(); 
+
     VkPipelineVertexInputStateCreateInfo vertexInput{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    vertexInput.vertexBindingDescriptionCount = 1;
+    vertexInput.pVertexBindingDescriptions = &bindingDesc;
+    vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribDescs.size());
+    vertexInput.pVertexAttributeDescriptions = attribDescs.data();
 
     VkPipelineInputAssemblyStateCreateInfo ia{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
     ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -226,20 +234,18 @@ VkShaderModule TriangleRenderer::createShaderModule(const void* bytes, size_t si
 void TriangleRenderer::record(  VkCommandBuffer cmd,
                                 VkFramebuffer framebuffer,
                                 VkExtent2D extent,
-                                VkClearColorValue clearColor) const {
-
-    record(cmd, framebuffer, extent, PushConstants{}, clearColor);
-}
-
-void TriangleRenderer::record(  VkCommandBuffer cmd,
-                                VkFramebuffer framebuffer,
-                                VkExtent2D extent,
+                                VkBuffer vertexBuffer,
+                                uint32_t vertexCount,
                                 const PushConstants& pushConstants,
                                 VkClearColorValue clearColor) const {
 
     if (cmd == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE) {
         throw std::invalid_argument("TriangleRenderer::record: invalid Vulkan handles");
     } 
+
+    if (vertexCount == 0) {
+        throw std::invalid_argument("TriangleRenderer::record: vertexCount must be greater than zero");
+    }
 
     VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     if (vkBeginCommandBuffer(cmd, &bi) != VK_SUCCESS) {
@@ -267,6 +273,9 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
                         sizeof(PushConstants),
                         &pushConstants);
 
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
+        
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;

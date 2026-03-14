@@ -1,4 +1,5 @@
 #pragma once 
+
 #include "Window.h"
 #include "Instance.h"
 #include "Surface.h"
@@ -9,6 +10,7 @@
 #include "CommandPool.h"
 #include "SwapchainBundle.h"
 #include "FrameSync.h"
+#include "MeshBuffer.h"
 #include "triangle/TriangleRenderer.h"
 
 #include <chrono>
@@ -35,6 +37,7 @@ private:
     SwapchainBundle swapchainBundle;
     TriangleRenderer triangle;
     CommandPool commandPool;
+    MeshBuffer meshBuffer;
     FrameSync sync;
     std::chrono::steady_clock::time_point startTime;
     std::chrono::steady_clock::time_point lastFrameTime;
