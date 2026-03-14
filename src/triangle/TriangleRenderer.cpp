@@ -115,6 +115,13 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
 
     VkPipelineMultisampleStateCreateInfo ms{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
     ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    
+    VkPipelineDepthStencilStateCreateInfo ds{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+    ds.depthTestEnable = VK_TRUE;
+    ds.depthWriteEnable = VK_TRUE;
+    ds.depthCompareOp = VK_COMPARE_OP_LESS;
+    ds.depthBoundsTestEnable = VK_FALSE;
+    ds.stencilTestEnable = VK_FALSE;
 
     VkPipelineColorBlendAttachmentState cba{};
     cba.colorWriteMask =    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | 
@@ -138,7 +145,7 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
     gp.pViewportState = &vp;
     gp.pRasterizationState = &rs;
     gp.pMultisampleState = &ms;
-    gp.pDepthStencilState = nullptr;
+    gp.pDepthStencilState = &ds; 
     gp.pColorBlendState = &cb;
     gp.pDynamicState = &dyn;
     gp.pTessellationState = nullptr;
@@ -252,16 +259,17 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
         throw std::runtime_error("vkBeginCommandBuffer failed");
     }
 
-    VkClearValue clear{};
-    clear.color = clearColor;
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = clearColor;
+    clearValues[1].depthStencil = { 1.0f, 0 };
 
     VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO }; 
     rp.renderPass = renderPass;
     rp.framebuffer = framebuffer;
     rp.renderArea.offset = { 0, 0 };
     rp.renderArea.extent = extent;
-    rp.clearValueCount = 1;
-    rp.pClearValues = &clear;
+    rp.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    rp.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);

@@ -1,5 +1,6 @@
 #pragma once
 #include "Swapchain.h"
+#include "DepthImage.h"
 #include "RenderPass.h"
 #include "Framebuffer.h"
 
@@ -32,6 +33,7 @@ private:
                 uint32_t height);
 private:
     Swapchain swapchainObj;
+    DepthImage depthImage;
     RenderPass renderPassObj;
     FramebufferSet framebufferSet;
 };

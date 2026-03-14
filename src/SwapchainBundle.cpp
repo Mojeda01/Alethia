@@ -7,11 +7,13 @@ SwapchainBundle::SwapchainBundle(   VkPhysicalDevice phys,
                                     uint32_t width,
                                     uint32_t height)
         :   swapchainObj(phys, device, surface, width, height)
-        , renderPassObj(device, swapchainObj.imageFormat())
+        , depthImage(device, phys, swapchainObj.extent())
+        , renderPassObj(device, swapchainObj.imageFormat(), depthImage.format())
         , framebufferSet(   device,
                             renderPassObj.get(),
                             swapchainObj.extent(),
-                            swapchainObj.imageViews())
+                            swapchainObj.imageViews(),
+                            depthImage.view())
 {
 }
 

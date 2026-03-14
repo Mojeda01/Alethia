@@ -3,7 +3,7 @@
 
 class RenderPass{
 public:
-    RenderPass(VkDevice device, VkFormat colorFormat);
+    RenderPass(VkDevice device, VkFormat colorFormat, VkFormat depthFormat);
     ~RenderPass();
     RenderPass(const RenderPass&) = delete;
     RenderPass& operator=(const RenderPass&) = delete;

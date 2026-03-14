@@ -7,7 +7,8 @@ public:
     FramebufferSet(VkDevice device,
                     VkRenderPass renderPass,
                     VkExtent2D extent,
-                    const std::vector<VkImageView>& imageView);
+                    const std::vector<VkImageView>& imageViews,
+                    VkImageView depthView);
     ~FramebufferSet();
     FramebufferSet(const FramebufferSet&) = delete;
     FramebufferSet& operator=(const FramebufferSet&) = delete;

@@ -5,18 +5,23 @@
 FramebufferSet::FramebufferSet(VkDevice dev,
                                 VkRenderPass renderPass,
                                 VkExtent2D extent,
-                                const std::vector<VkImageView>& imageViews) 
+                                const std::vector<VkImageView>& imageViews,
+                                VkImageView depthView) 
     : device(dev) 
 {
+    if (depthView == VK_NULL_HANDLE) {
+        throw std::invalid_argument("FramebufferSet: depthView must not be VK_NULL_HANDLE");
+    }
+
     framebuffers.resize(imageViews.size());
 
     for (size_t i = 0; i < imageViews.size(); ++i) {
-        VkImageView attachments[] = { imageViews[i] };
+        std::array<VkImageView, 2> attachments = { imageViews[i], depthView }; 
 
         VkFramebufferCreateInfo ci{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
         ci.renderPass = renderPass;
-        ci.attachmentCount = 1;
-        ci.pAttachments = attachments;
+        ci.attachmentCount = static_cast<uint32_t>(attachments.size()); 
+        ci.pAttachments = attachments.data();
         ci.width = extent.width;
         ci.height = extent.height;
         ci.layers = 1;
