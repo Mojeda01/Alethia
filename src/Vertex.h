@@ -9,6 +9,7 @@
 struct Vertex{
     float position[3];
     float color[3];
+    float normal[3];
 
     static VkVertexInputBindingDescription bindingDescription() {
         VkVertexInputBindingDescription desc{};
@@ -18,8 +19,8 @@ struct Vertex{
         return desc;
     }
     
-    static std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions() { 
-        std::array<VkVertexInputAttributeDescription, 2> attrs{};
+        static std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions() {
+            std::array<VkVertexInputAttributeDescription, 3> attrs{};
 
         attrs[0].binding = 0;
         attrs[0].location = 0;
@@ -30,6 +31,11 @@ struct Vertex{
         attrs[1].location = 1;
         attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
         attrs[1].offset = offsetof(Vertex, color);
+        
+        attrs[2].binding = 0;
+        attrs[2].location = 2;
+        attrs[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attrs[2].offset = offsetof(Vertex, normal);
         return attrs;
     }
 

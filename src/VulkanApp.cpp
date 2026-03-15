@@ -1,14 +1,19 @@
 #include "VulkanApp.h"
 #include "Vertex.h"
+
+#define GLM_FORCE_DEPTH_TO_ONE
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 
 static std::vector<Vertex> makeTriangleVertices() {
     return {
-        { {  0.0f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
-        { {  0.5f,  0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
-        { { -0.5f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+        { {  0.0f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+        { {  0.5f,  0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+        { { -0.5f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } },
     };
 }
 
@@ -151,6 +156,8 @@ void VulkanApp::drawFrame() {
     mvp.model = glm::mat4(1.0f);
     mvp.view = camera.viewMatrix();
     mvp.projection = camera.projectionMatrix();
+    mvp.lightPos =  glm::vec4(0.0f, 0.0f, 5.0f, 1.0f); 
+    mvp.viewPos = glm::vec4(camera.position(), 1.0f);
     uniformBuffer.update(imageIndex, mvp);
 
     TriangleRenderer::PushConstants pushConstants{};
