@@ -8,7 +8,7 @@ layout(set = 0, binding = 0) uniform MVP {
     vec4 viewPos;
 } mvp;
 
-layout(push_constant) uniform Push{
+layout(push_constant) uniform Push {
     layout(offset = 0) float timeSeconds;
     layout(offset = 4) float deltaSeconds;
     layout(offset = 8) uint frameIndex;
@@ -22,6 +22,7 @@ layout(location = 2) in vec3 inNormal;
 layout(location = 0) out vec3 vColor;
 layout(location = 1) out vec3 vNormal;
 layout(location = 2) out vec3 vWorldPos;
+layout(location = 3) out float vDist;
 
 void main() {
     vec4 worldPos = mvp.model * vec4(inPosition, 1.0);
@@ -30,4 +31,5 @@ void main() {
     vWorldPos = worldPos.xyz;
     vNormal = mat3(mvp.model) * inNormal;
     vColor = inColor;
+    vDist = length(mvp.viewPos.xyz - worldPos.xyz);
 }

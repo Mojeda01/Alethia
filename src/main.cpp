@@ -4,7 +4,7 @@
 
 int main() {
     try {
-        VulkanApp app(800, 600, "VulkanLab");
+        VulkanApp app(1280, 720, "VulkanLab");
         app.run();
     } catch (const std::exception& e) {
         std::cerr << e.what() << "\n";
