@@ -22,7 +22,10 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                         surface.get(),
                         (uint32_t)width,
                         (uint32_t)height)
-    , triangle(device.get(), swapchainBundle.renderPass())
+    , uniformBuffer(    device.get(),
+                        device.physical(),
+                        (uint32_t)swapchainBundle.framebuffers().size())
+    , triangle(device.get(), swapchainBundle.renderPass(), uniformBuffer.descriptorSetLayout())
     , commandPool(  device.get(),
                     device.graphicsQueueFamily(),
                     swapchainBundle.framebuffers().size())
@@ -32,10 +35,17 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     device.graphicsQueue(),
                     makeTriangleVertices())
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
-            (uint32_t)swapchainBundle.framebuffers().size()) 
+            (uint32_t)swapchainBundle.framebuffers().size())
+    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 100.0f)
 {
     glfwSetWindowUserPointer(window.get(), this);
     glfwSetFramebufferSizeCallback(window.get(), VulkanApp::framebufferResizeCallback);
+    glfwSetCursorPosCallback(window.get(), VulkanApp::cursorPosCallback);
+    glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    if (glfwRawMouseMotionSupported()) {
+        glfwSetInputMode(window.get(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    }
 
     auto now = std::chrono::steady_clock::now();
     startTime = now;
@@ -46,6 +56,12 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 void VulkanApp::run() {
     while (!window.shouldClose()) {
         window.pollEvents();
+
+        if (glfwGetKey(window.get(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            glfwSetWindowShouldClose(window.get(), GLFW_TRUE);
+            continue;
+        }
+
         drawFrame();
     }
     vkDeviceWaitIdle(device.get());
@@ -60,6 +76,25 @@ void VulkanApp::framebufferResizeCallback(GLFWwindow* window, int /*width*/, int
     if (app) {
         app->framebufferResized = true;
     }
+}
+
+void VulkanApp::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    auto* app = reinterpret_cast<VulkanApp*>(glfwGetWindowUserPointer(window));
+    if (!app) return;
+
+    if (app->firstMouse) {
+        app->lastMouseX = xpos;
+        app->lastMouseY = ypos;
+        app->firstMouse = false;
+        return;
+    }
+
+    double xOffset = xpos - app->lastMouseX;
+    double yOffset = ypos - app->lastMouseY;
+    app->lastMouseX = xpos;
+    app->lastMouseY = ypos;
+
+    app->camera.processMouse(xOffset, yOffset);
 }
 
 void VulkanApp::drawFrame() {
@@ -110,12 +145,20 @@ void VulkanApp::drawFrame() {
     float deltaSeconds = std::chrono::duration<float>(now - lastFrameTime).count();
     lastFrameTime = now;
 
+    camera.processKeyboard(window.get(), deltaSeconds);
+
+    UniformBuffer::MVPData mvp{};
+    mvp.model = glm::mat4(1.0f);
+    mvp.view = camera.viewMatrix();
+    mvp.projection = camera.projectionMatrix();
+    uniformBuffer.update(imageIndex, mvp);
+
     TriangleRenderer::PushConstants pushConstants{};
     pushConstants.timeSeconds = timeSeconds;
     pushConstants.deltaSeconds = deltaSeconds;
     pushConstants.frameIndex = frameIndex++;
 
-    recordClearCommandBuffer(cmd, imageIndex, pushConstants);
+    recordCommandBuffer(cmd, imageIndex, pushConstants);
 
     // submit
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -156,11 +199,12 @@ void VulkanApp::drawFrame() {
     sync.advanceFrame();
 }
 
-void VulkanApp::recordClearCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants) {
+void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants) {
     triangle.record(    cmd, swapchainBundle.framebuffers()[imageIndex],
                         swapchainBundle.extent(),
                         meshBuffer.vertexBuffer(),
                         meshBuffer.vertexCount(),
+                        uniformBuffer.descriptorSet(imageIndex),
                         pushConstants); 
 }
 
@@ -180,4 +224,6 @@ void VulkanApp::recreateSwapchain() {
         static_cast<uint32_t>(fb.first),
         static_cast<uint32_t>(fb.second)
     );
+
+    camera.setAspectRatio(static_cast<float>(fb.first) / static_cast<float>(fb.second));
 }

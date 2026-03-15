@@ -6,7 +6,7 @@
 
 class TriangleRenderer {
 public:
-    TriangleRenderer(VkDevice device, VkRenderPass renderPass);
+    TriangleRenderer(VkDevice device, VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout);
     ~TriangleRenderer();
 
     TriangleRenderer(const TriangleRenderer&) = delete;
@@ -25,9 +25,10 @@ public:
                     VkExtent2D extent,
                     VkBuffer vertexBuffer,
                     uint32_t vertexCount,
+                    VkDescriptorSet descriptorSet,
                     const PushConstants& pushConstants,
                     VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
- 
+
 private:
     VkShaderModule createShaderModule(const void* bytes, size_t sizeBytes) const;
 private:

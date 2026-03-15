@@ -8,11 +8,12 @@
 #include <cstring>
 #include <stdexcept>
 #include <vector>
+#include <array>
 
 static_assert(sizeof(TriangleRenderer::PushConstants) == 16, "Push constants must be 16 bytes");
 
 namespace{
-std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) { 
+std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
     if (!file) {
         throw std::runtime_error("Failed to open shader file: " + path.string());
@@ -50,8 +51,10 @@ std::filesystem::path shaderPath(const char* file) {
 }
 } // namespace
 
-TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev), renderPass(rp) {
-    if (device == VK_NULL_HANDLE || renderPass == VK_NULL_HANDLE) {
+TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp, VkDescriptorSetLayout dsLayout)
+    : device(dev), renderPass(rp)
+{
+    if (device == VK_NULL_HANDLE || renderPass == VK_NULL_HANDLE || dsLayout == VK_NULL_HANDLE) {
         throw std::invalid_argument("TriangleRenderer: invalid Vulkan handles");
     }
 
@@ -67,92 +70,95 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp) : device(dev),
         tmpVert = createShaderModule(vertWords.data(), vertWords.size() * sizeof(std::uint32_t));
         tmpFrag = createShaderModule(fragWords.data(), fragWords.size() * sizeof(std::uint32_t));
 
-        VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
         VkPushConstantRange pcr{};
         pcr.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pcr.offset = 0;
         pcr.size = sizeof(PushConstants);
 
+        VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        pl.setLayoutCount = 1;
+        pl.pSetLayouts = &dsLayout;
         pl.pushConstantRangeCount = 1;
         pl.pPushConstantRanges = &pcr;
+
         if (vkCreatePipelineLayout(device, &pl, nullptr, &tmpLayout) != VK_SUCCESS) {
             throw std::runtime_error("vkCreatePipelineLayout failed");
         }
 
         VkPipelineShaderStageCreateInfo vertStage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT; 
+        vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
         vertStage.module = tmpVert;
-        vertStage.pName = "main"; 
+        vertStage.pName = "main";
 
         VkPipelineShaderStageCreateInfo fragStage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         fragStage.module = tmpFrag;
-        fragStage.pName = "main"; 
+        fragStage.pName = "main";
 
         VkPipelineShaderStageCreateInfo stages[] = { vertStage, fragStage };
 
         auto bindingDesc = Vertex::bindingDescription();
-        auto attribDescs = Vertex::attributeDescriptions(); 
+        auto attribDescs = Vertex::attributeDescriptions();
 
-    VkPipelineVertexInputStateCreateInfo vertexInput{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-    vertexInput.vertexBindingDescriptionCount = 1;
-    vertexInput.pVertexBindingDescriptions = &bindingDesc;
-    vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribDescs.size());
-    vertexInput.pVertexAttributeDescriptions = attribDescs.data();
+        VkPipelineVertexInputStateCreateInfo vertexInput{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+        vertexInput.vertexBindingDescriptionCount = 1;
+        vertexInput.pVertexBindingDescriptions = &bindingDesc;
+        vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribDescs.size());
+        vertexInput.pVertexAttributeDescriptions = attribDescs.data();
 
-    VkPipelineInputAssemblyStateCreateInfo ia{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    
-    VkPipelineViewportStateCreateInfo vp{ VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
-    vp.viewportCount = 1;
-    vp.scissorCount = 1;
+        VkPipelineInputAssemblyStateCreateInfo ia{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+        ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-    VkPipelineRasterizationStateCreateInfo rs{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-    rs.polygonMode = VK_POLYGON_MODE_FILL;
-    rs.cullMode = VK_CULL_MODE_NONE;
-    rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rs.lineWidth = 1.0f;
+        VkPipelineViewportStateCreateInfo vp{ VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+        vp.viewportCount = 1;
+        vp.scissorCount = 1;
 
-    VkPipelineMultisampleStateCreateInfo ms{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    
-    VkPipelineDepthStencilStateCreateInfo ds{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-    ds.depthTestEnable = VK_TRUE;
-    ds.depthWriteEnable = VK_TRUE;
-    ds.depthCompareOp = VK_COMPARE_OP_LESS;
-    ds.depthBoundsTestEnable = VK_FALSE;
-    ds.stencilTestEnable = VK_FALSE;
+        VkPipelineRasterizationStateCreateInfo rs{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+        rs.polygonMode = VK_POLYGON_MODE_FILL;
+        rs.cullMode = VK_CULL_MODE_NONE;
+        rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rs.lineWidth = 1.0f;
 
-    VkPipelineColorBlendAttachmentState cba{};
-    cba.colorWriteMask =    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | 
-                            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        VkPipelineMultisampleStateCreateInfo ms{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+        ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    cb.attachmentCount = 1;
-    cb.pAttachments = &cba;
+        VkPipelineDepthStencilStateCreateInfo ds{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+        ds.depthTestEnable = VK_TRUE;
+        ds.depthWriteEnable = VK_TRUE;
+        ds.depthCompareOp = VK_COMPARE_OP_LESS;
+        ds.depthBoundsTestEnable = VK_FALSE;
+        ds.stencilTestEnable = VK_FALSE;
 
-    VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR }; 
-    VkPipelineDynamicStateCreateInfo dyn{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-    dyn.dynamicStateCount = static_cast<uint32_t>(sizeof(dynStates) / sizeof(dynStates[0]));
-    dyn.pDynamicStates = dynStates;
+        VkPipelineColorBlendAttachmentState cba{};
+        cba.colorWriteMask =    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
-    VkPipelineCache cache = VK_NULL_HANDLE;
-    VkGraphicsPipelineCreateInfo gp{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-    gp.stageCount = 2;
-    gp.pStages = stages;
-    gp.pVertexInputState = &vertexInput;
-    gp.pInputAssemblyState = &ia;
-    gp.pViewportState = &vp;
-    gp.pRasterizationState = &rs;
-    gp.pMultisampleState = &ms;
-    gp.pDepthStencilState = &ds; 
-    gp.pColorBlendState = &cb;
-    gp.pDynamicState = &dyn;
-    gp.pTessellationState = nullptr;
-    gp.layout = tmpLayout;
-    gp.renderPass = renderPass;
-    gp.subpass = 0;
-        
+        VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+        cb.attachmentCount = 1;
+        cb.pAttachments = &cba;
+
+        VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dyn{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+        dyn.dynamicStateCount = static_cast<uint32_t>(sizeof(dynStates) / sizeof(dynStates[0]));
+        dyn.pDynamicStates = dynStates;
+
+        VkPipelineCache cache = VK_NULL_HANDLE;
+        VkGraphicsPipelineCreateInfo gp{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+        gp.stageCount = 2;
+        gp.pStages = stages;
+        gp.pVertexInputState = &vertexInput;
+        gp.pInputAssemblyState = &ia;
+        gp.pViewportState = &vp;
+        gp.pRasterizationState = &rs;
+        gp.pMultisampleState = &ms;
+        gp.pDepthStencilState = &ds;
+        gp.pColorBlendState = &cb;
+        gp.pDynamicState = &dyn;
+        gp.pTessellationState = nullptr;
+        gp.layout = tmpLayout;
+        gp.renderPass = renderPass;
+        gp.subpass = 0;
+
         if (vkCreateGraphicsPipelines(device, cache, 1, &gp, nullptr, &tmpPipeline) != VK_SUCCESS) {
             throw std::runtime_error("vkCreateGraphicsPipeline failed");
         }
@@ -229,7 +235,7 @@ VkShaderModule TriangleRenderer::createShaderModule(const void* bytes, size_t si
 
     VkShaderModuleCreateInfo ci{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     ci.codeSize = sizeBytes;
-    ci.pCode = reinterpret_cast<const uint32_t*>(bytes); 
+    ci.pCode = reinterpret_cast<const uint32_t*>(bytes);
 
     VkShaderModule mod = VK_NULL_HANDLE;
     if (vkCreateShaderModule(device, &ci, nullptr, &mod) != VK_SUCCESS) {
@@ -243,12 +249,13 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
                                 VkExtent2D extent,
                                 VkBuffer vertexBuffer,
                                 uint32_t vertexCount,
+                                VkDescriptorSet descriptorSet,
                                 const PushConstants& pushConstants,
                                 VkClearColorValue clearColor) const {
 
-    if (cmd == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE) {
+    if (cmd == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE || descriptorSet == VK_NULL_HANDLE) {
         throw std::invalid_argument("TriangleRenderer::record: invalid Vulkan handles");
-    } 
+    }
 
     if (vertexCount == 0) {
         throw std::invalid_argument("TriangleRenderer::record: vertexCount must be greater than zero");
@@ -263,7 +270,7 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
     clearValues[0].color = clearColor;
     clearValues[1].depthStencil = { 1.0f, 0 };
 
-    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO }; 
+    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     rp.renderPass = renderPass;
     rp.framebuffer = framebuffer;
     rp.renderArea.offset = { 0, 0 };
@@ -273,7 +280,10 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
 
     vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                            0, 1, &descriptorSet, 0, nullptr);
+
     vkCmdPushConstants( cmd,
                         pipelineLayout,
                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -283,7 +293,7 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
 
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
-        
+
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -298,7 +308,7 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
     scissor.extent = extent;
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    vkCmdDraw(cmd, 3, 1, 0, 0);
+    vkCmdDraw(cmd, vertexCount, 1, 0, 0);
     vkCmdEndRenderPass(cmd);
 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
