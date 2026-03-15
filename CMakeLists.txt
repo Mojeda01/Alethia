@@ -69,6 +69,7 @@ add_executable(VulkanLab
     src/DepthImage.cpp
     src/UniformBuffer.cpp
     src/Camera.cpp
+    src/ObjLoader.cpp
 )
 
 add_dependencies(VulkanLab VulkanLabShaders)

@@ -29,6 +29,16 @@ public:
                     const PushConstants& pushConstants,
                     VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
 
+    void recordIndexed( VkCommandBuffer cmd,
+                        VkFramebuffer framebuffer,
+                        VkExtent2D extent,
+                        VkBuffer vertexBuffer,
+                        VkBuffer indexBuffer,
+                        uint32_t indexCount,
+                        VkDescriptorSet descriptorSet,
+                        const PushConstants& pushConstants,
+                        VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
+
 private:
     VkShaderModule createShaderModule(const void* bytes, size_t sizeBytes) const;
 private:

@@ -23,7 +23,7 @@ public:
 private:
     void updateVectors();
 
-    glm::vec3 pos = glm::vec3(0.0f, 0.0f, 2.0f);
+    glm::vec3 pos = glm::vec3(0.0f, 500.0f, 0.0f); 
     glm::vec3 front = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);
@@ -36,6 +36,6 @@ private:
     float nearZ;
     float farZ;
 
-    float moveSpeed = 2.5f;
+    float moveSpeed = 500.0f; 
     float mouseSensitivity = 0.1f;
 };

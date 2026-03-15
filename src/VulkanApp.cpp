@@ -1,5 +1,6 @@
 #include "VulkanApp.h"
 #include "Vertex.h"
+#include "ObjLoader.h"
 
 #define GLM_FORCE_DEPTH_TO_ONE
 #include <glm/glm.hpp>
@@ -9,12 +10,9 @@
 #include <stdexcept>
 #include <vector>
 
-static std::vector<Vertex> makeTriangleVertices() {
-    return {
-        { {  0.0f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
-        { {  0.5f,  0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
-        { { -0.5f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } },
-    };
+static const ObjMesh& getCityMesh() {
+    static ObjMesh mesh = loadObj("assets/city/city_model/OBJ/Castelia City.obj");
+    return mesh;
 }
 
 VulkanApp::VulkanApp(int width, int height, const char* title)
@@ -38,7 +36,8 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     device.physical(),
                     commandPool.get(),
                     device.graphicsQueue(),
-                    makeTriangleVertices())
+                    getCityMesh().vertices,
+                    getCityMesh().indices)
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size())
     , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 100.0f)
@@ -156,7 +155,7 @@ void VulkanApp::drawFrame() {
     mvp.model = glm::mat4(1.0f);
     mvp.view = camera.viewMatrix();
     mvp.projection = camera.projectionMatrix();
-    mvp.lightPos =  glm::vec4(0.0f, 0.0f, 5.0f, 1.0f); 
+    mvp.lightPos = glm::vec4(0.0f, 50000.0f, 0.0f, 1.0f); 
     mvp.viewPos = glm::vec4(camera.position(), 1.0f);
     uniformBuffer.update(imageIndex, mvp);
 
@@ -207,12 +206,24 @@ void VulkanApp::drawFrame() {
 }
 
 void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants) {
-    triangle.record(    cmd, swapchainBundle.framebuffers()[imageIndex],
-                        swapchainBundle.extent(),
-                        meshBuffer.vertexBuffer(),
-                        meshBuffer.vertexCount(),
-                        uniformBuffer.descriptorSet(imageIndex),
-                        pushConstants); 
+
+    if (meshBuffer.hasIndices()) {
+        triangle.recordIndexed( cmd, swapchainBundle.framebuffers()[imageIndex],
+                                swapchainBundle.extent(),
+                                meshBuffer.vertexBuffer(),
+                                meshBuffer.indexBuffer(),
+                                meshBuffer.indexCount(),
+                                uniformBuffer.descriptorSet(imageIndex),
+                                pushConstants);
+    } else {
+        triangle.record(    cmd, swapchainBundle.framebuffers()[imageIndex],
+                            swapchainBundle.extent(),
+                            meshBuffer.vertexBuffer(),
+                            meshBuffer.vertexCount(),
+                            uniformBuffer.descriptorSet(imageIndex),
+                            pushConstants);
+    }
+
 }
 
 void VulkanApp::recreateSwapchain() {

@@ -315,3 +315,78 @@ void TriangleRenderer::record(  VkCommandBuffer cmd,
         throw std::runtime_error("vkEndCommandBuffer failed");
     }
 }
+
+void TriangleRenderer::recordIndexed(
+                                VkCommandBuffer cmd,
+                                VkFramebuffer framebuffer,
+                                VkExtent2D extent,
+                                VkBuffer vertexBuffer,
+                                VkBuffer indexBuffer,
+                                uint32_t indexCount,
+                                VkDescriptorSet descriptorSet,
+                                const PushConstants& pushConstants,
+                                VkClearColorValue clearColor) const {
+
+    if (cmd == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE || descriptorSet == VK_NULL_HANDLE) {
+        throw std::invalid_argument("TriangleRenderer::recordIndexed: invalid Vulkan handles");
+    }
+
+    if (indexCount == 0) {
+        throw std::invalid_argument("TriangleRenderer::recordIndexed: indexCount must be greater than zero");
+    }
+
+    VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    if (vkBeginCommandBuffer(cmd, &bi) != VK_SUCCESS) {
+        throw std::runtime_error("vkBeginCommandBuffer failed");
+    }
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = clearColor;
+    clearValues[1].depthStencil = { 1.0f, 0 };
+
+    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    rp.renderPass = renderPass;
+    rp.framebuffer = framebuffer;
+    rp.renderArea.offset = { 0, 0 };
+    rp.renderArea.extent = extent;
+    rp.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    rp.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                            0, 1, &descriptorSet, 0, nullptr);
+
+    vkCmdPushConstants( cmd,
+                        pipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                        0,
+                        sizeof(PushConstants),
+                        &pushConstants);
+
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
+    vkCmdBindIndexBuffer(cmd, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = extent;
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
+    vkCmdEndRenderPass(cmd);
+
+    if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
+        throw std::runtime_error("vkEndCommandBuffer failed");
+    }
+}
