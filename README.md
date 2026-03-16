@@ -1,4 +1,4 @@
-# Alethia
+<h1 align="center">Alethia</h1>
 
 [![website](https://img.shields.io/badge/website-marco--oj.no-blue)](https://marco-oj.no)
 ![C++](https://img.shields.io/badge/C%2B%2B-20-blue)
@@ -6,9 +6,10 @@
 ![Vulkan](https://img.shields.io/badge/Vulkan-1.3-red)
 ![status](https://img.shields.io/badge/status-WIP-yellow)
 
-A custom Vulkan rendering engine built from scratch. GPU vertex buffers,
-depth testing, SPIR-V shader pipeline, swapchain management with resize
-handling. 
+A custom Vulkan rendering engine built from scratch. Loads 3D models
+with textures, renders with Blinn-Phong lighting, hemisphere ambient,
+distance fog, and a first-person camera. Currently loading a full city
+model with 405 materials and 383 textures.
 
 ## Requirements
 
@@ -16,6 +17,7 @@ handling.
 - C++20 compiler
 - Vulkan SDK (for headers/loader + `glslc` or `glslangValidator`)
 - GLFW3
+- GLM
 
 Note: macOS typically uses MoltenVK; this project enables Vulkan portability extensions.
 
@@ -26,11 +28,19 @@ cmake --build build -j
 ./build/VulkanLab
 ```
 
+## Controls
+
+- **WASD** — move
+- **Mouse** — look
+- **Space** — up
+- **Shift** — down
+- **Escape** — quit
+
 ## Architecture
 ```
 src/
 ├── main.cpp              Entry point
-├── VulkanApp.h/cpp       Application loop and frame submission
+├── VulkanApp.h/cpp       Application loop, input, frame submission
 ├── Window.h/cpp          GLFW window wrapper
 ├── Instance.h/cpp        Vulkan instance
 ├── Surface.h/cpp         Window surface
@@ -43,14 +53,20 @@ src/
 ├── CommandPool.h/cpp     Command pool and buffer allocation
 ├── FrameSync.h/cpp       Semaphores and fences for frame pacing
 ├── Buffer.h/cpp          General-purpose Vulkan buffer (RAII)
-├── MeshBuffer.h/cpp      Staged vertex upload to device-local memory
-├── Vertex.h              Vertex layout and input descriptions
+├── MeshBuffer.h/cpp      Staged vertex/index upload to device-local memory
+├── Vertex.h              Vertex layout (position, color, normal, texcoord)
+├── ObjLoader.h/cpp       OBJ/MTL parser with triangulation and deduplication
+├── TextureImage.h/cpp    VkImage + sampler from PNG/JPG via stb_image
+├── UniformBuffer.h/cpp   Per-frame UBO with MVP + lighting descriptor sets
+├── Camera.h/cpp          First-person camera with mouse look
+├── external/
+│   ├── tiny_obj_loader.h OBJ/MTL parsing (tinyobjloader)
+│   └── stb_image.h       Image decoding (stb)
 └── triangle/
     └── TriangleRenderer  Shader pipeline, push constants, draw recording
 
 shaders/
-├── triangle.vert         Vertex shader (vertex attributes + time rotation)
-└── triangle.frag         Fragment shader (color cycling)
+├── triangle.vert         MVP transform, normals, texcoords, fog distance
+└── triangle.frag         Texture sampling, Blinn-Phong, hemisphere ambient,
+                          rim light, distance fog, gamma correction
 ```
-
-
