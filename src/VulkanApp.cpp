@@ -15,6 +15,15 @@ static const ObjMesh& getCityMesh() {
     return mesh;
 }
 
+static std::string findFirstTexture(const ObjMesh& mesh) {
+    for (const auto& [matName, texFile] : mesh.materialTextures) {
+        std::string fullPath = mesh.textureBasePath + texFile;
+        return fullPath;
+    }
+    return "";
+        
+}
+
 VulkanApp::VulkanApp(int width, int height, const char* title)
     : window(width, height, title)
     , instance()
@@ -38,9 +47,14 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     device.graphicsQueue(),
                     getCityMesh().vertices,
                     getCityMesh().indices)
+    , texture(      device.get(),
+                    device.physical(),
+                    commandPool.get(),
+                    device.graphicsQueue(),
+                    findFirstTexture(getCityMesh()))
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size())
-    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 100.0f)
+    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 1.0f, 500000.0f) 
 {
     glfwSetWindowUserPointer(window.get(), this);
     glfwSetFramebufferSizeCallback(window.get(), VulkanApp::framebufferResizeCallback);
@@ -55,6 +69,15 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     startTime = now;
     lastFrameTime = now;
     std::cout << "Vulkan fully initialized\n";
+
+
+    std::cout << "Materials with textures: " << getCityMesh().materialTextures.size() << "\n";
+    for (const auto& [name, tex] : getCityMesh().materialTextures) {
+        std::cout << "  " << name << " -> " << tex << "\n";
+    }
+    uniformBuffer.bindTexture(texture.view(), texture.sampler());
+    std::cout << "Texture bound: " << findFirstTexture(getCityMesh()) << "\n";
+
 }
 
 void VulkanApp::run() {

@@ -13,6 +13,7 @@
 #include "MeshBuffer.h"
 #include "UniformBuffer.h"
 #include "Camera.h"
+#include "TextureImage.h"
 #include "triangle/TriangleRenderer.h"
 
 #include <chrono>
@@ -41,6 +42,7 @@ private:
     TriangleRenderer triangle;
     CommandPool commandPool;
     MeshBuffer meshBuffer;
+    TextureImage texture;
     FrameSync sync;
     Camera camera;
     std::chrono::steady_clock::time_point startTime;

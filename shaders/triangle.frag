@@ -15,10 +15,13 @@ layout(push_constant) uniform Push {
     layout(offset = 12) float pad;
 } pc;
 
+layout(set = 0, binding = 1) uniform sampler2D texSampler;
+
 layout(location = 0) in vec3 vColor;
 layout(location = 1) in vec3 vNormal;
 layout(location = 2) in vec3 vWorldPos;
 layout(location = 3) in float vDist;
+layout(location = 4) in vec2 vTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
@@ -45,13 +48,17 @@ void main() {
     float rim = 1.0 - max(dot(viewDir, normal), 0.0);
     rim = pow(rim, 3.0) * 0.15;
 
-    // combine
-    vec3 lit = vColor * (ambient + diff) + specColor + vec3(rim);
+    // sample texture
+    vec3 texColor = texture(texSampler, vTexCoord).rgb;
+    vec3 baseColor = texColor * vColor;
+
+    // combine 
+    vec3 lit = baseColor * (ambient + diff) + specColor + vec3(rim);
 
     // distance fog
     vec3 fogColor = vec3(0.05, 0.05, 0.08);
-    float fogStart = 5000.0;
-    float fogEnd = 80000.0;
+    float fogStart = 50000.0;
+    float fogEnd = 400000.0;
     float fogFactor = clamp((vDist - fogStart) / (fogEnd - fogStart), 0.0, 1.0);
     lit = mix(lit, fogColor, fogFactor);
 

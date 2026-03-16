@@ -27,6 +27,7 @@ public:
     UniformBuffer(UniformBuffer&&) noexcept;
     UniformBuffer& operator=(UniformBuffer&&) noexcept;
     void update(uint32_t frameIndex, const MVPData& data);
+    void bindTexture(VkImageView textureView, VkSampler textureSampler);
     VkDescriptorSetLayout descriptorSetLayout() const { return layout; }
     VkDescriptorSet descriptorSet(uint32_t frameIndex) const { return sets[frameIndex]; }
 private:

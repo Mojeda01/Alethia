@@ -18,11 +18,13 @@ layout(push_constant) uniform Push {
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inNormal;
+layout(location = 3) in vec2 inTexCoord;
 
 layout(location = 0) out vec3 vColor;
 layout(location = 1) out vec3 vNormal;
 layout(location = 2) out vec3 vWorldPos;
 layout(location = 3) out float vDist;
+layout(location = 4) out vec2 vTexCoord;
 
 void main() {
     vec4 worldPos = mvp.model * vec4(inPosition, 1.0);
@@ -32,4 +34,5 @@ void main() {
     vNormal = mat3(mvp.model) * inNormal;
     vColor = inColor;
     vDist = length(mvp.viewPos.xyz - worldPos.xyz);
+    vTexCoord = inTexCoord;
 }

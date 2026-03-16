@@ -6,7 +6,9 @@
 #include <unordered_map>
 #include <string>
 #include <cstring>
-
+#include <iostream>
+#include <fstream>
+#include <map>
 
 namespace{
 struct VertexKey{
@@ -33,13 +35,49 @@ ObjMesh loadObj(const std::string& objPath) {
     std::vector<tinyobj::material_t> materials;
     std::string warn, err;
     std::string mtlDir = objPath.substr(0, objPath.find_last_of("/\\") + 1);
+
+    {
+        std::string testPath = mtlDir + "Castelia City.mtl";
+        std::ifstream testFile(testPath);
+        std::cout << "MTL test path: [" << testPath << "] exists: " << testFile.good() << "\n";
+    }
+ 
+    std::string mtlPath = mtlDir + "Castelia City.mtl";
+    std::map<std::string, int> matMap;
+    std::ifstream mtlStream(mtlPath);
+    if (mtlStream.good()) {
+        tinyobj::LoadMtl(&matMap, &materials, &mtlStream, &warn, &err);
+        std::cout << "MTL loaded directly: " << materials.size() << " materials\n";
+        mtlStream.close();
+    }
     bool ok = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
             objPath.c_str(), mtlDir.c_str(), true);
+
     if (!ok) {
         throw std::runtime_error("Failed to load OBJ: " + err);
     }
-    
+   
+    if (!warn.empty()) {
+        std::cout << "OBJ warning: " << warn << "\n";
+    }
+    if (!err.empty()) {
+        std::cout << "OBJ error: " << err << "\n";
+    }
+
+    std::cout << "OBJ loaded: " << materials.size() << " materials\n";
+    for (size_t i = 0; i < materials.size() && i < 5; ++i) {
+        std::cout << "  mat[" << i << "] name=" << materials[i].name
+            << " diffuse_texname=" << materials[i].diffuse_texname << "\n";
+    }
+
     ObjMesh mesh;
+    mesh.textureBasePath = mtlDir;
+    for (const auto& mat : materials) {
+        if (!mat.diffuse_texname.empty()) {
+            mesh.materialTextures[mat.name] = mat.diffuse_texname;
+        }
+    }
+        
     std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVerts;
 
     for (const auto& shape : shapes) {
@@ -85,6 +123,15 @@ ObjMesh loadObj(const std::string& objPath) {
                             vert.normal[1] = 1.0f;
                             vert.normal[2] = 0.0f;
                         }
+
+                        if (idx.texcoord_index >= 0) {
+                            vert.texCoord[0] = attrib.texcoords[2 * idx.texcoord_index + 0];
+                            vert.texCoord[1] = 1.0f - attrib.texcoords[2 * idx.texcoord_index + 1];
+                        } else {
+                            vert.texCoord[0] = 0.0f;
+                            vert.texCoord[1] = 0.0f;
+                        }
+
                         uint32_t newIndex = static_cast<uint32_t>(mesh.vertices.size());
                         mesh.vertices.push_back(vert);
                         mesh.indices.push_back(newIndex);

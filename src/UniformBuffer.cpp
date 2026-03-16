@@ -32,28 +32,35 @@ UniformBuffer::UniformBuffer(VkDevice dev,
         throw std::invalid_argument("UniformBuffer: frameCount must be greater than zero");
     }
 
-    VkDescriptorSetLayoutBinding binding{};
-    binding.binding = 0;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT; 
+    VkDescriptorSetLayoutBinding bindings[2]{};
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo layoutCi{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    layoutCi.bindingCount = 1;
-    layoutCi.pBindings = &binding;
+    layoutCi.bindingCount = 2;
+    layoutCi.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutCi, nullptr, &layout) != VK_SUCCESS) {
         throw std::runtime_error("UniformBuffer: vkCreateDescriptorSetLayout failed");
     }
 
-    VkDescriptorPoolSize poolSize{};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = frameCount;
+    VkDescriptorPoolSize poolSizes[2]{};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = frameCount;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = frameCount;
 
     VkDescriptorPoolCreateInfo poolCi{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
     poolCi.maxSets = frameCount;
-    poolCi.poolSizeCount = 1;
-    poolCi.pPoolSizes = &poolSize;
+    poolCi.poolSizeCount = 2;
+    poolCi.pPoolSizes = poolSizes;
 
     if (vkCreateDescriptorPool(device, &poolCi, nullptr, &pool) != VK_SUCCESS) {
         vkDestroyDescriptorSetLayout(device, layout, nullptr);
@@ -200,4 +207,21 @@ UniformBuffer::~UniformBuffer() {
 
 void UniformBuffer::update(uint32_t frameIndex, const MVPData& data) {
     std::memcpy(mappedPtrs[frameIndex], &data, sizeof(MVPData));
+}
+
+void UniformBuffer::bindTexture(VkImageView textureView, VkSampler textureSampler) {
+    for (uint32_t i = 0; i < frameCount; ++i) {
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = textureView;
+        imageInfo.sampler = textureSampler;
+        VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        write.dstSet = sets[i];
+        write.dstBinding = 1;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo = &imageInfo;
+        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+    }
 }
