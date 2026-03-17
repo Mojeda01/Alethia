@@ -48,6 +48,7 @@ add_library(VulkanTriangle STATIC
     src/triangle/TriangleRenderer.cpp
 )
 target_compile_definitions(VulkanTriangle PRIVATE VULKANLAB_SHADER_DIR="${SHADER_BIN_DIR}")
+target_include_directories(VulkanTriangle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(VulkanTriangle PUBLIC Vulkan::Vulkan)
 
 add_executable(VulkanLab 
@@ -70,7 +71,17 @@ add_executable(VulkanLab
     src/UniformBuffer.cpp
     src/Camera.cpp
     src/ObjLoader.cpp
+    src/TextureImage.cpp
+    src/ImGuiLayer.cpp
+    src/external/imgui/imgui.cpp
+    src/external/imgui/imgui_draw.cpp
+    src/external/imgui/imgui_tables.cpp
+    src/external/imgui/imgui_widgets.cpp
+    src/external/imgui/imgui_demo.cpp
+    src/external/imgui/imgui_impl_glfw.cpp
+    src/external/imgui/imgui_impl_vulkan.cpp
 )
 
 add_dependencies(VulkanLab VulkanLabShaders)
+target_include_directories(VulkanLab PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/external/imgui)
 target_link_libraries(VulkanLab PRIVATE Vulkan::Vulkan glfw VulkanTriangle)
