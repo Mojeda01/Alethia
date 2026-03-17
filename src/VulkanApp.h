@@ -14,6 +14,7 @@
 #include "UniformBuffer.h"
 #include "Camera.h"
 #include "TextureImage.h"
+#include "ImGuiLayer.h"
 #include "triangle/TriangleRenderer.h"
 
 #include <chrono>
@@ -45,6 +46,8 @@ private:
     TextureImage texture;
     FrameSync sync;
     Camera camera;
+    ImGuiLayer imgui;
+    bool uiMode = false;
     std::chrono::steady_clock::time_point startTime;
     std::chrono::steady_clock::time_point lastFrameTime;
     std::uint32_t frameIndex = 0;

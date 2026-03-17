@@ -38,6 +38,8 @@ public:
                         VkDescriptorSet descriptorSet,
                         const PushConstants& pushConstants,
                         VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
+    VkPipeline getPipeline() const { return pipeline; }
+    VkPipelineLayout getPipelineLayout() const { return pipelineLayout; }
 
 private:
     VkShaderModule createShaderModule(const void* bytes, size_t sizeBytes) const;

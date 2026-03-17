@@ -1,6 +1,7 @@
 #include "VulkanApp.h"
 #include "Vertex.h"
 #include "ObjLoader.h"
+#include <imgui.h>
 
 #define GLM_FORCE_DEPTH_TO_ONE
 #include <glm/glm.hpp>
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <array>
 
 static const ObjMesh& getCityMesh() {
     static ObjMesh mesh = loadObj("assets/city/city_model/OBJ/Castelia City.obj");
@@ -54,7 +56,15 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     findFirstTexture(getCityMesh()))
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size())
-    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 1.0f, 500000.0f) 
+    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 1.0f, 500000.0f)
+    , imgui(    window.get(),
+                instance.get(),
+                device.physical(),
+                device.get(),
+                device.graphicsQueueFamily(),
+                device.graphicsQueue(),
+                swapchainBundle.renderPass(),
+                static_cast<uint32_t>(swapchainBundle.framebuffers().size()))
 {
     glfwSetWindowUserPointer(window.get(), this);
     glfwSetFramebufferSizeCallback(window.get(), VulkanApp::framebufferResizeCallback);
@@ -89,6 +99,19 @@ void VulkanApp::run() {
             continue;
         }
 
+        static bool tabWasPressed = false;
+        bool tabPressed = glfwGetKey(window.get(), GLFW_KEY_TAB) == GLFW_PRESS;
+        if (tabPressed && !tabWasPressed) {
+            uiMode = !uiMode;
+            if (uiMode) {
+                glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                firstMouse = true;
+            }
+        }
+        tabWasPressed = tabPressed;
+
         drawFrame();
     }
     vkDeviceWaitIdle(device.get());
@@ -108,6 +131,8 @@ void VulkanApp::framebufferResizeCallback(GLFWwindow* window, int /*width*/, int
 void VulkanApp::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     auto* app = reinterpret_cast<VulkanApp*>(glfwGetWindowUserPointer(window));
     if (!app) return;
+
+    if (app->uiMode) return;
 
     if (app->firstMouse) {
         app->lastMouseX = xpos;
@@ -172,7 +197,20 @@ void VulkanApp::drawFrame() {
     float deltaSeconds = std::chrono::duration<float>(now - lastFrameTime).count();
     lastFrameTime = now;
 
-    camera.processKeyboard(window.get(), deltaSeconds);
+    if (!uiMode) {
+        camera.processKeyboard(window.get(), deltaSeconds);
+    }
+
+    imgui.newFrame();
+    ImGui::Begin("Alethia");
+    ImGui::Text("FPS: %.1f", 1.0f / deltaSeconds);
+    ImGui::Text("Frame: %u", frameIndex);
+    ImGui::Text("Pos: %.0f, %.0f, %.0f",
+            camera.position().x, camera.position().y, camera.position().z);
+    ImGui::Text("Vertices: %u", meshBuffer.vertexCount());
+    ImGui::Text("Indices: %u", meshBuffer.hasIndices() ? meshBuffer.indexCount() : 0u);
+    ImGui::Text("Tab to toggle UI mode");
+    ImGui::End();
 
     UniformBuffer::MVPData mvp{};
     mvp.model = glm::mat4(1.0f);
@@ -229,24 +267,60 @@ void VulkanApp::drawFrame() {
 }
 
 void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants) {
-
-    if (meshBuffer.hasIndices()) {
-        triangle.recordIndexed( cmd, swapchainBundle.framebuffers()[imageIndex],
-                                swapchainBundle.extent(),
-                                meshBuffer.vertexBuffer(),
-                                meshBuffer.indexBuffer(),
-                                meshBuffer.indexCount(),
-                                uniformBuffer.descriptorSet(imageIndex),
-                                pushConstants);
-    } else {
-        triangle.record(    cmd, swapchainBundle.framebuffers()[imageIndex],
-                            swapchainBundle.extent(),
-                            meshBuffer.vertexBuffer(),
-                            meshBuffer.vertexCount(),
-                            uniformBuffer.descriptorSet(imageIndex),
-                            pushConstants);
+    VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    if (vkBeginCommandBuffer(cmd, &bi) != VK_SUCCESS) {
+        throw std::runtime_error("vkBeginCommandBuffer failed");
     }
 
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = { { 0.05f, 0.05f, 0.05f, 1.0f } };
+    clearValues[1].depthStencil = { 1.0f, 0 };
+
+    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    rp.renderPass = swapchainBundle.renderPass();
+    rp.framebuffer = swapchainBundle.framebuffers()[imageIndex];
+    rp.renderArea.offset = { 0, 0 };
+    rp.renderArea.extent = swapchainBundle.extent();
+    rp.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    rp.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipeline());
+
+    VkDescriptorSet ds = uniformBuffer.descriptorSet(imageIndex);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
+                            0, 1, &ds, 0, nullptr);
+
+    vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                        0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
+    VkDeviceSize offset = 0;
+    VkBuffer vb = meshBuffer.vertexBuffer();
+    vkCmdBindVertexBuffers(cmd, 0, 1, &vb, &offset);
+
+    VkViewport viewport{};
+    viewport.width = static_cast<float>(swapchainBundle.extent().width);
+    viewport.height = static_cast<float>(swapchainBundle.extent().height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.extent = swapchainBundle.extent();
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    if (meshBuffer.hasIndices()) {
+        VkBuffer ib = meshBuffer.indexBuffer();
+        vkCmdBindIndexBuffer(cmd, ib, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(cmd, meshBuffer.indexCount(), 1, 0, 0, 0);
+    } else {
+        vkCmdDraw(cmd, meshBuffer.vertexCount(), 1, 0, 0);
+    }
+    imgui.render(cmd);
+    vkCmdEndRenderPass(cmd);
+    if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
+        throw std::runtime_error("vkEndCommandBuffer failed");
+    }
 }
 
 void VulkanApp::recreateSwapchain() {
