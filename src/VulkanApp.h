@@ -51,6 +51,10 @@ private:
     DebugUI debugUI;
     bool uiMode = false;
     float lightPos[3] = { 0.0f, 50000.0f, 0.0f };
+    bool wireframe = false;
+    static constexpr int FRAME_TIME_COUNT = 120;
+    float frameTimes[FRAME_TIME_COUNT] = {};
+    int frameTimeIndex = 0;
     std::chrono::steady_clock::time_point startTime;
     std::chrono::steady_clock::time_point lastFrameTime;
     std::uint32_t frameIndex = 0;

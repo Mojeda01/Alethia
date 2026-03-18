@@ -89,13 +89,15 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     std::cout << "Texture bound: " << findFirstTexture(getCityMesh()) << "\n";
     
     debugUI.addPanel("Performance", [this]() {
-            float fps = 1.0f / std::chrono::duration<float>(
-                    std::chrono::steady_clock::now() - lastFrameTime).count();
-            ImGui::Text("FPS: %.1f", fps);
-            ImGui::Text("Frame: %u", frameIndex);
-            ImGui::Text("Frame time: %.2f ms",
-                    std::chrono::duration<float, std::milli>(
-                        std::chrono::steady_clock::now() - lastFrameTime).count());
+        float avg = 0.0f;
+        for (int i = 0; i < FRAME_TIME_COUNT; ++i) avg += frameTimes[i];
+        avg /= static_cast<float>(FRAME_TIME_COUNT);
+        ImGui::Text("FPS: %.0f", avg > 0.0f ? 1000.0f / avg : 0.0f);
+        ImGui::Text("Frame: %u", frameIndex);
+        ImGui::Text("Frame time: %.2f ms", avg);
+        ImGui::PlotLines("##frametime", frameTimes, FRAME_TIME_COUNT,
+                            frameTimeIndex, nullptr, 0.0f, 2.0f, ImVec2(0, 40));
+
     });
 
     debugUI.addPanel("Camera", [this]() {
@@ -114,6 +116,10 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
             ImGui::SliderFloat("Light X", &lightPos[0], -100000.0f, 100000.0f);
             ImGui::SliderFloat("Light Y", &lightPos[1], -100000.0f, 100000.0f);
             ImGui::SliderFloat("Light Z", &lightPos[2], -100000.0f, 100000.0f);
+    });
+
+    debugUI.addPanel("Render", [this]() {
+            ImGui::Checkbox("Wireframe", &wireframe);
     });
 
 }
@@ -224,6 +230,9 @@ void VulkanApp::drawFrame() {
     float timeSeconds = std::chrono::duration<float>(now - startTime).count();
     float deltaSeconds = std::chrono::duration<float>(now - lastFrameTime).count();
     lastFrameTime = now;
+    
+    frameTimes[frameTimeIndex] = deltaSeconds * 1000.0f;
+    frameTimeIndex = (frameTimeIndex + 1) % FRAME_TIME_COUNT;
 
     if (!uiMode) {
         camera.processKeyboard(window.get(), deltaSeconds);
@@ -305,7 +314,8 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     rp.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipeline());
+    VkPipeline activePipeline = wireframe ? triangle.getWireframePipeline() : triangle.getPipeline();
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, activePipeline);
 
     VkDescriptorSet ds = uniformBuffer.descriptorSet(imageIndex);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),

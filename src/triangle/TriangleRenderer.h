@@ -39,6 +39,7 @@ public:
                         const PushConstants& pushConstants,
                         VkClearColorValue clearColor = { { 0.05f, 0.05f, 0.05f, 1.0f } }) const;
     VkPipeline getPipeline() const { return pipeline; }
+    VkPipeline getWireframePipeline() const { return wireframePipeline; }
     VkPipelineLayout getPipelineLayout() const { return pipelineLayout; }
 
 private:
@@ -49,6 +50,7 @@ private:
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline pipeline = VK_NULL_HANDLE;
+    VkPipeline wireframePipeline = VK_NULL_HANDLE;
     VkShaderModule vertModule = VK_NULL_HANDLE;
     VkShaderModule fragModule = VK_NULL_HANDLE;
 };
