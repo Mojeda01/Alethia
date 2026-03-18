@@ -1,4 +1,6 @@
-<h1 align="center">Alethia</h1>
+<p align="center">
+  <img src="screenshots/logo.png" alt="Alethia" width="400" />
+</p>
 
 [![website](https://img.shields.io/badge/website-marco--oj.no-blue)](https://marco-oj.no)
 ![C++](https://img.shields.io/badge/C%2B%2B-20-blue)
@@ -7,6 +9,8 @@
 ![status](https://img.shields.io/badge/status-WIP-yellow)
 
 ![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
+![Alethia Screenshot](screenshots/alethia_2.png)
+
 
 A custom Vulkan rendering engine built from scratch. Loads 3D models
 with textures, renders with Blinn-Phong lighting, hemisphere ambient,
