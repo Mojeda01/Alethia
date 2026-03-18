@@ -8,14 +8,14 @@
 ![Vulkan](https://img.shields.io/badge/Vulkan-1.3-red)
 ![status](https://img.shields.io/badge/status-WIP-yellow)
 
-![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
-![Alethia Screenshot](screenshots/aleitha_2.png)
-
-
 A custom Vulkan rendering engine built from scratch. Loads 3D models
 with textures, renders with Blinn-Phong lighting, hemisphere ambient,
 distance fog, and a first-person camera. Currently loading a full city
 model with 405 materials and 383 textures.
+
+
+![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
+![Alethia Screenshot](screenshots/aleitha_2.png)
 
 ## Requirements
 
