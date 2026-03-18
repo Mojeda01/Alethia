@@ -9,7 +9,7 @@
 ![status](https://img.shields.io/badge/status-WIP-yellow)
 
 ![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
-![Alethia Screenshot](screenshots/alethia_2.png)
+![Alethia Screenshot](screenshots/aleitha_2.png)
 
 
 A custom Vulkan rendering engine built from scratch. Loads 3D models
