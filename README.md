@@ -2,11 +2,26 @@
   <img src="screenshots/logo.png" alt="Alethia" width="400" />
 </p>
 
-[![website](https://img.shields.io/badge/website-marco--oj.no-blue)](https://marco-oj.no)
-![C++](https://img.shields.io/badge/C%2B%2B-20-blue)
-![CMake](https://img.shields.io/badge/CMake-3.21+-orange)
-![Vulkan](https://img.shields.io/badge/Vulkan-1.3-red)
-![status](https://img.shields.io/badge/status-WIP-yellow)
+<p align="center">
+  <a href="https://marco-oj.no"><img src="https://img.shields.io/badge/website-marco--oj.no-blue" alt="website"></a>
+  <img src="https://img.shields.io/badge/C%2B%2B-20-blue" alt="C++">
+  <img src="https://img.shields.io/badge/CMake-3.21+-orange" alt="CMake">
+  <img src="https://img.shields.io/badge/Vulkan-1.3-red" alt="Vulkan">
+  <img src="https://img.shields.io/badge/status-WIP-yellow" alt="status">
+  <br>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="platform">
+  <img src="https://img.shields.io/badge/GPU-MoltenVK%20%7C%20AMD%20%7C%20NVIDIA-green" alt="GPU">
+  <img src="https://img.shields.io/badge/renderer-custom%20Vulkan-blueviolet" alt="renderer">
+  <img src="https://img.shields.io/badge/shading-Blinn--Phong-informational" alt="shading">
+  <br>
+  <img src="https://img.shields.io/badge/textures-stb__image-orange" alt="textures">
+  <img src="https://img.shields.io/badge/models-tinyobjloader-orange" alt="models">
+  <img src="https://img.shields.io/badge/UI-Dear%20ImGui-blue" alt="ImGui">
+  <img src="https://img.shields.io/badge/math-GLM-purple" alt="GLM">
+  <img src="https://img.shields.io/badge/windowing-GLFW3-green" alt="GLFW">
+  <br>
+  <img src="https://img.shields.io/badge/license-proprietary-red" alt="license">
+</p>
 
 A custom Vulkan rendering engine built from scratch. Loads 3D models
 with textures, renders with Blinn-Phong lighting, hemisphere ambient,
