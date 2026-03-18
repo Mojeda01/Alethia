@@ -42,10 +42,28 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV})
+set(GRID_VERT_SPV ${SHADER_BIN_DIR}/grid.vert.spv)
+set(GRID_FRAG_SPV ${SHADER_BIN_DIR}/grid.frag.spv)
+
+add_custom_command(
+    OUTPUT ${GRID_VERT_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/grid.vert -o ${GRID_VERT_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/grid.vert
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${GRID_FRAG_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/grid.frag -o ${GRID_FRAG_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/grid.frag
+    VERBATIM
+)
+
+add_custom_target(VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV} ${GRID_VERT_SPV} ${GRID_FRAG_SPV})
 
 add_library(VulkanTriangle STATIC
     src/triangle/TriangleRenderer.cpp
+    src/GridRenderer.cpp
 )
 target_compile_definitions(VulkanTriangle PRIVATE VULKANLAB_SHADER_DIR="${SHADER_BIN_DIR}")
 target_include_directories(VulkanTriangle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -71,7 +89,7 @@ add_executable(VulkanLab
     src/UniformBuffer.cpp
     src/Camera.cpp
     src/ObjLoader.cpp
-    src/TextureImage.cpp
+    src/TextureImage.cpp 
     src/ImGuiLayer.cpp
     src/DebugUI.cpp 
     src/external/imgui/imgui.cpp

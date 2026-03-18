@@ -1,6 +1,5 @@
 #include "VulkanApp.h"
 #include "Vertex.h"
-#include "ObjLoader.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_TO_ONE
@@ -12,18 +11,20 @@
 #include <vector>
 #include <array>
 
-static const ObjMesh& getCityMesh() {
-    static ObjMesh mesh = loadObj("assets/city/city_model/OBJ/Castelia City.obj");
-    return mesh;
-}
+static std::vector<Vertex> makeGridQuad() {
+    const float SIZE = 500.0f;
+    Vertex v{};
+    v.color[0] = 0.3f; v.color[1] = 0.3f; v.color[2] = 0.3f;
+    v.normal[0] = 0.0f; v.normal[1] = 1.0f; v.normal[2] = 0.0f;
 
-static std::string findFirstTexture(const ObjMesh& mesh) {
-    for (const auto& [matName, texFile] : mesh.materialTextures) {
-        std::string fullPath = mesh.textureBasePath + texFile;
-        return fullPath;
-    }
-    return "";
-        
+    std::vector<Vertex> verts(6, v);
+    verts[0].position[0] = -SIZE; verts[0].position[1] = 0.0f; verts[0].position[2] = -SIZE;
+    verts[1].position[0] =  SIZE; verts[1].position[1] = 0.0f; verts[1].position[2] = -SIZE;
+    verts[2].position[0] =  SIZE; verts[2].position[1] = 0.0f; verts[2].position[2] =  SIZE;
+    verts[3].position[0] = -SIZE; verts[3].position[1] = 0.0f; verts[3].position[2] = -SIZE;
+    verts[4].position[0] =  SIZE; verts[4].position[1] = 0.0f; verts[4].position[2] =  SIZE;
+    verts[5].position[0] = -SIZE; verts[5].position[1] = 0.0f; verts[5].position[2] =  SIZE;
+    return verts;
 }
 
 VulkanApp::VulkanApp(int width, int height, const char* title)
@@ -40,23 +41,18 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                         device.physical(),
                         (uint32_t)swapchainBundle.framebuffers().size())
     , triangle(device.get(), swapchainBundle.renderPass(), uniformBuffer.descriptorSetLayout())
+    , grid(device.get(), swapchainBundle.renderPass(), uniformBuffer.descriptorSetLayout())
     , commandPool(  device.get(),
                     device.graphicsQueueFamily(),
                     swapchainBundle.framebuffers().size())
-    , meshBuffer(   device.get(),
+    , gridMesh(     device.get(),
                     device.physical(),
                     commandPool.get(),
                     device.graphicsQueue(),
-                    getCityMesh().vertices,
-                    getCityMesh().indices)
-    , texture(      device.get(),
-                    device.physical(),
-                    commandPool.get(),
-                    device.graphicsQueue(),
-                    findFirstTexture(getCityMesh()))
+                    makeGridQuad())
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size())
-    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 1.0f, 500000.0f)
+    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 1000.0f) 
     , imgui(    window.get(),
                 instance.get(),
                 device.physical(),
@@ -80,14 +76,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     lastFrameTime = now;
     std::cout << "Vulkan fully initialized\n";
 
-
-    std::cout << "Materials with textures: " << getCityMesh().materialTextures.size() << "\n";
-    for (const auto& [name, tex] : getCityMesh().materialTextures) {
-        std::cout << "  " << name << " -> " << tex << "\n";
-    }
-    uniformBuffer.bindTexture(texture.view(), texture.sampler());
-    std::cout << "Texture bound: " << findFirstTexture(getCityMesh()) << "\n";
-    
+ 
     debugUI.addPanel("Performance", [this]() {
         float avg = 0.0f;
         for (int i = 0; i < FRAME_TIME_COUNT; ++i) avg += frameTimes[i];
@@ -107,15 +96,14 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     });
 
     debugUI.addPanel("Scene", [this]() {
-            ImGui::Text("Vertices: %u", meshBuffer.vertexCount());
-            ImGui::Text("Indices: %u", meshBuffer.hasIndices() ? meshBuffer.indexCount() : 0u);
-            ImGui::Text("Materials: %zu", getCityMesh().materialTextures.size());
+            ImGui::Text("Grid: 1000x1000 units");
+            ImGui::Text("Grid spacing: 1m / 10m");
     });
 
     debugUI.addPanel("Lighting", [this]() {
-            ImGui::SliderFloat("Light X", &lightPos[0], -100000.0f, 100000.0f);
-            ImGui::SliderFloat("Light Y", &lightPos[1], -100000.0f, 100000.0f);
-            ImGui::SliderFloat("Light Z", &lightPos[2], -100000.0f, 100000.0f);
+        ImGui::SliderFloat("Light X", &lightPos[0], -50.0f, 50.0f);
+        ImGui::SliderFloat("Light Y", &lightPos[1], 0.0f, 50.0f);
+        ImGui::SliderFloat("Light Z", &lightPos[2], -50.0f, 50.0f);
     });
 
     debugUI.addPanel("Render", [this]() {
@@ -302,7 +290,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     }
 
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { { 0.05f, 0.05f, 0.05f, 1.0f } };
+    clearValues[0].color = { { 0.12f, 0.12f, 0.14f, 1.0f } };
     clearValues[1].depthStencil = { 1.0f, 0 };
 
     VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
@@ -314,19 +302,6 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     rp.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
-    VkPipeline activePipeline = wireframe ? triangle.getWireframePipeline() : triangle.getPipeline();
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, activePipeline);
-
-    VkDescriptorSet ds = uniformBuffer.descriptorSet(imageIndex);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
-                            0, 1, &ds, 0, nullptr);
-
-    vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                        0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
-    VkDeviceSize offset = 0;
-    VkBuffer vb = meshBuffer.vertexBuffer();
-    vkCmdBindVertexBuffers(cmd, 0, 1, &vb, &offset);
 
     VkViewport viewport{};
     viewport.width = static_cast<float>(swapchainBundle.extent().width);
@@ -339,15 +314,20 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     scissor.extent = swapchainBundle.extent();
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    if (meshBuffer.hasIndices()) {
-        VkBuffer ib = meshBuffer.indexBuffer();
-        vkCmdBindIndexBuffer(cmd, ib, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(cmd, meshBuffer.indexCount(), 1, 0, 0, 0);
-    } else {
-        vkCmdDraw(cmd, meshBuffer.vertexCount(), 1, 0, 0);
-    }
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, grid.getPipeline());
+
+    VkDescriptorSet ds = uniformBuffer.descriptorSet(imageIndex);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, grid.getPipelineLayout(), 
+                            0, 1, &ds, 0, nullptr);
+
+    VkDeviceSize offset = 0;
+    VkBuffer gridVb = gridMesh.vertexBuffer();
+    vkCmdBindVertexBuffers(cmd, 0, 1, &gridVb, &offset);
+    vkCmdDraw(cmd, 6, 1, 0, 0);
+
     imgui.render(cmd);
     vkCmdEndRenderPass(cmd);
+
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
         throw std::runtime_error("vkEndCommandBuffer failed");
     }

@@ -16,6 +16,7 @@
 #include "TextureImage.h"
 #include "ImGuiLayer.h"
 #include "DebugUI.h"
+#include "GridRenderer.h"
 #include "triangle/TriangleRenderer.h"
 
 #include <chrono>
@@ -42,15 +43,15 @@ private:
     SwapchainBundle swapchainBundle; 
     UniformBuffer uniformBuffer;
     TriangleRenderer triangle;
+    GridRenderer grid;
     CommandPool commandPool;
-    MeshBuffer meshBuffer;
-    TextureImage texture;
+    MeshBuffer gridMesh;
     FrameSync sync;
     Camera camera;
     ImGuiLayer imgui;
     DebugUI debugUI;
     bool uiMode = false;
-    float lightPos[3] = { 0.0f, 50000.0f, 0.0f };
+    float lightPos[3] = { 5.0f, 10.0f, 5.0f }; 
     bool wireframe = false;
     static constexpr int FRAME_TIME_COUNT = 120;
     float frameTimes[FRAME_TIME_COUNT] = {};

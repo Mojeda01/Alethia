@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <utility>
 #include <array>
+#include <iostream>
 
 VkFormat DepthImage::findSupportedFormat(VkPhysicalDevice physicalDevice) {
     const std::array<VkFormat, 3> candidates = {
@@ -49,6 +50,7 @@ DepthImage::DepthImage( VkDevice dev,
     }
     
     depthFormat = findSupportedFormat(physicalDevice);
+    std::cout << "Depth format: " << depthFormat << "\n";
 
     VkImageCreateInfo ici{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     ici.imageType = VK_IMAGE_TYPE_2D;

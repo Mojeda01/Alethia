@@ -23,19 +23,19 @@ public:
 private:
     void updateVectors();
 
-    glm::vec3 pos = glm::vec3(0.0f, 500.0f, 0.0f); 
+    glm::vec3 pos = glm::vec3(0.0f, 3.0f, 5.0f); 
     glm::vec3 front = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);
 
     float yawAngle = -90.0f;
-    float pitchAngle = 0.0f;
+    float pitchAngle = -15.0f; 
 
     float fov;
     float aspect;
     float nearZ;
     float farZ;
 
-    float moveSpeed = 500.0f; 
+    float moveSpeed = 50.0f; 
     float mouseSensitivity = 0.1f;
 };
