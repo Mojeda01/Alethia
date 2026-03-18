@@ -73,6 +73,7 @@ add_executable(VulkanLab
     src/ObjLoader.cpp
     src/TextureImage.cpp
     src/ImGuiLayer.cpp
+    src/DebugUI.cpp 
     src/external/imgui/imgui.cpp
     src/external/imgui/imgui_draw.cpp
     src/external/imgui/imgui_tables.cpp

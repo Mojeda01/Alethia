@@ -87,6 +87,34 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     }
     uniformBuffer.bindTexture(texture.view(), texture.sampler());
     std::cout << "Texture bound: " << findFirstTexture(getCityMesh()) << "\n";
+    
+    debugUI.addPanel("Performance", [this]() {
+            float fps = 1.0f / std::chrono::duration<float>(
+                    std::chrono::steady_clock::now() - lastFrameTime).count();
+            ImGui::Text("FPS: %.1f", fps);
+            ImGui::Text("Frame: %u", frameIndex);
+            ImGui::Text("Frame time: %.2f ms",
+                    std::chrono::duration<float, std::milli>(
+                        std::chrono::steady_clock::now() - lastFrameTime).count());
+    });
+
+    debugUI.addPanel("Camera", [this]() {
+            glm::vec3 pos = camera.position();
+            ImGui::Text("Position: %.0f, %.0f, %.0f", pos.x, pos.y, pos.z);
+            ImGui::Text("Yaw: %.1f  Pitch: %.1f", camera.yaw(), camera.pitch());
+    });
+
+    debugUI.addPanel("Scene", [this]() {
+            ImGui::Text("Vertices: %u", meshBuffer.vertexCount());
+            ImGui::Text("Indices: %u", meshBuffer.hasIndices() ? meshBuffer.indexCount() : 0u);
+            ImGui::Text("Materials: %zu", getCityMesh().materialTextures.size());
+    });
+
+    debugUI.addPanel("Lighting", [this]() {
+            ImGui::SliderFloat("Light X", &lightPos[0], -100000.0f, 100000.0f);
+            ImGui::SliderFloat("Light Y", &lightPos[1], -100000.0f, 100000.0f);
+            ImGui::SliderFloat("Light Z", &lightPos[2], -100000.0f, 100000.0f);
+    });
 
 }
 
@@ -202,21 +230,13 @@ void VulkanApp::drawFrame() {
     }
 
     imgui.newFrame();
-    ImGui::Begin("Alethia");
-    ImGui::Text("FPS: %.1f", 1.0f / deltaSeconds);
-    ImGui::Text("Frame: %u", frameIndex);
-    ImGui::Text("Pos: %.0f, %.0f, %.0f",
-            camera.position().x, camera.position().y, camera.position().z);
-    ImGui::Text("Vertices: %u", meshBuffer.vertexCount());
-    ImGui::Text("Indices: %u", meshBuffer.hasIndices() ? meshBuffer.indexCount() : 0u);
-    ImGui::Text("Tab to toggle UI mode");
-    ImGui::End();
+    debugUI.draw();
 
     UniformBuffer::MVPData mvp{};
     mvp.model = glm::mat4(1.0f);
     mvp.view = camera.viewMatrix();
     mvp.projection = camera.projectionMatrix();
-    mvp.lightPos = glm::vec4(0.0f, 50000.0f, 0.0f, 1.0f); 
+    mvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
     mvp.viewPos = glm::vec4(camera.position(), 1.0f);
     uniformBuffer.update(imageIndex, mvp);
 

@@ -15,6 +15,7 @@
 #include "Camera.h"
 #include "TextureImage.h"
 #include "ImGuiLayer.h"
+#include "DebugUI.h"
 #include "triangle/TriangleRenderer.h"
 
 #include <chrono>
@@ -47,7 +48,9 @@ private:
     FrameSync sync;
     Camera camera;
     ImGuiLayer imgui;
+    DebugUI debugUI;
     bool uiMode = false;
+    float lightPos[3] = { 0.0f, 50000.0f, 0.0f };
     std::chrono::steady_clock::time_point startTime;
     std::chrono::steady_clock::time_point lastFrameTime;
     std::uint32_t frameIndex = 0;
