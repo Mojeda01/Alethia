@@ -112,6 +112,8 @@ add_executable(VulkanLab
     src/DebugUI.cpp
     src/GizmoRenderer.cpp
     src/GizmoMesh.cpp
+    src/CubeMesh.cpp
+    src/DevTexture.cpp
     src/external/imgui/imgui.cpp
     src/external/imgui/imgui_draw.cpp
     src/external/imgui/imgui_tables.cpp

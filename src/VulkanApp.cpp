@@ -1,16 +1,19 @@
 #include "VulkanApp.h"
 #include "Vertex.h"
 #include "GizmoMesh.h"
+#include "CubeMesh.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 #include <array>
+#include <cmath>
 
 static std::vector<Vertex> makeGridQuad() {
     const float SIZE = 500.0f;
@@ -29,6 +32,7 @@ static std::vector<Vertex> makeGridQuad() {
 }
 
 static GizmoGeometry gizmoGeometry = makeGizmoMesh();
+static CubeGeometry cubeGeometry = makeCube(1.0f);
 
 VulkanApp::VulkanApp(int width, int height, const char* title)
     : window(width, height, title)
@@ -60,6 +64,16 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     device.graphicsQueue(),
                     gizmoGeometry.vertices,  
                     gizmoGeometry.indices)
+    , cubeMesh(     device.get(),
+                    device.physical(),
+                    commandPool.get(),
+                    device.graphicsQueue(),
+                    cubeGeometry.vertices,
+                    cubeGeometry.indices)
+    , devTexture(   device.get(),
+                    device.physical(),
+                    commandPool.get(),
+                    device.graphicsQueue())
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size())
     , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 1000.0f) 
@@ -75,6 +89,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     glfwSetWindowUserPointer(window.get(), this);
     glfwSetFramebufferSizeCallback(window.get(), VulkanApp::framebufferResizeCallback);
     glfwSetCursorPosCallback(window.get(), VulkanApp::cursorPosCallback);
+    glfwSetMouseButtonCallback(window.get(), VulkanApp::mouseButtonCallback); 
     glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     if (glfwRawMouseMotionSupported()) {
@@ -106,8 +121,13 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     });
 
     debugUI.addPanel("Scene", [this]() {
-            ImGui::Text("Grid: 1000x1000 units");
-            ImGui::Text("Grid spacing: 1m / 10m");
+        ImGui::Text("Grid: 1000x1000 units");
+        ImGui::Text("Grid spacing: 1m / 10m");
+        ImGui::Separator();
+        ImGui::Text("Cubes: %zu", cubePositions.size());
+        if (ImGui::Button("Clear All Cubes")) {
+            cubePositions.clear();
+        }
     });
 
     debugUI.addPanel("Lighting", [this]() {
@@ -119,7 +139,8 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     debugUI.addPanel("Render", [this]() {
             ImGui::Checkbox("Wireframe", &wireframe);
     });
-
+    
+    uniformBuffer.bindTexture(devTexture.view(), devTexture.sampler());
 }
 
 void VulkanApp::run() {
@@ -181,7 +202,64 @@ void VulkanApp::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) 
     app->camera.processMouse(xOffset, yOffset);
 }
 
-void VulkanApp::drawFrame() {
+void VulkanApp::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) { 
+    (void)mods;
+    auto* app = reinterpret_cast<VulkanApp*>(glfwGetWindowUserPointer(window));
+    if(!app) return;
+    if(!app->uiMode) return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        glm::vec3 hit = app->raycastGrid(mx, my);
+        if (hit.y > -9999.0f) {
+            float snappedX = std::floor(hit.x) + 0.5f;
+            float snappedZ = std::floor(hit.z) + 0.5f;
+            app->cubePositions.push_back(glm::vec3(snappedX, 0.5f, snappedZ));
+        }
+    }
+}
+
+glm::vec3 VulkanApp::raycastGrid(double mouseX, double mouseY) const {
+    int width, height;
+    glfwGetFramebufferSize(window.get(), &width, &height);
+
+    float ndcX = (2.0f * static_cast<float>(mouseX)) / static_cast<float>(width) - 1.0f;
+    float ndcY = 1.0f - (2.0f * static_cast<float>(mouseY)) / static_cast<float>(height) - 1.0f;
+
+    glm::vec4 clipNear(ndcX, ndcY, 0.0f, 1.0f);
+    glm::vec4 clipFar(ndcX, ndcY, 1.0f, 1.0f);
+    glfwGetFramebufferSize(window.get(), &width, &height);
+
+    glm::mat4 invProj = glm::inverse(camera.projectionMatrix());
+    glm::mat4 invView = glm::inverse(camera.viewMatrix());
+
+    glm::vec4 viewNear = invProj * clipNear;
+    viewNear /= viewNear.w;
+    glm::vec4 viewFar = invProj * clipFar;
+    viewFar /= viewFar.w;
+
+    glm::vec3 worldNear = glm::vec3(invView * viewNear);
+    glm::vec3 worldFar = glm::vec3(invView * viewFar);
+
+    glm::vec3 rayDir = glm::normalize(worldFar - worldNear);
+    glm::vec3 rayOrigin = worldNear;
+
+    if (std::abs(rayDir.y) < 0.0001f) {
+        return glm::vec3(0.0f, -10000.0f, 0.0f);
+    }
+
+    float t = -rayOrigin.y / rayDir.y;
+    if (t < 0.0f) {
+        return glm::vec3(0.0f, -10000.0f, 0.0f);
+    }
+    return rayOrigin + rayDir * t;
+}
+
+void VulkanApp::drawFrame(){
     VkDevice dev = device.get();
 
     if (framebufferResized) {
@@ -334,6 +412,37 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     VkBuffer gridVb = gridMesh.vertexBuffer();
     vkCmdBindVertexBuffers(cmd, 0, 1, &gridVb, &offset);
     vkCmdDraw(cmd, 6, 1, 0, 0);
+
+    // Draw Cubes
+    if (!cubePositions.empty()) {
+        VkPipeline scenePipeline = wireframe ? triangle.getWireframePipeline() : triangle.getPipeline();
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
+
+        VkDescriptorSet sceneDs = uniformBuffer.descriptorSet(imageIndex);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
+                                    0, 1, &sceneDs, 0, nullptr);
+
+        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                            0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
+
+        VkDeviceSize cubeOffset = 0;
+        VkBuffer cubeVb = cubeMesh.vertexBuffer();
+        vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &cubeOffset);
+        VkBuffer cubeIb = cubeMesh.indexBuffer();
+        vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
+
+        for (const auto& pos : cubePositions) {
+            UniformBuffer::MVPData cubeMvp{};
+            cubeMvp.model = glm::translate(glm::mat4(1.0f), pos);
+            cubeMvp.view = camera.viewMatrix();
+            cubeMvp.projection = camera.projectionMatrix();
+            cubeMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
+            cubeMvp.viewPos = glm::vec4(camera.position(), 1.0f);
+            uniformBuffer.update(imageIndex, cubeMvp);
+            vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+        }
+    }
     
     // Gizmo code
     {

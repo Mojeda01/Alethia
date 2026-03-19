@@ -20,9 +20,15 @@
 #include "triangle/TriangleRenderer.h"
 #include "GizmoRenderer.h"
 #include "GizmoMesh.h"
+#include "CubeMesh.h"
+#include "DevTexture.h"
 
 #include <chrono>
 #include <cstdint>
+#include <vector>
+
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
 
 class VulkanApp{
 public:
@@ -37,6 +43,8 @@ private:
     void recreateSwapchain();
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
     static void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
+    static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+    glm::vec3 raycastGrid(double mouseX, double mouseY) const;
 private:
     Window window;
     Instance instance;
@@ -50,6 +58,9 @@ private:
     MeshBuffer gridMesh;
     GizmoRenderer gizmo;
     MeshBuffer gizmoMesh;
+    MeshBuffer cubeMesh;
+    DevTexture devTexture;
+    std::vector<glm::vec3> cubePositions;
     FrameSync sync;
     Camera camera;
     ImGuiLayer imgui;

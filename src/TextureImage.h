@@ -15,6 +15,15 @@ public:
 
     TextureImage(
         VkDevice device,
+        VkPhysicalDevice physicalDevice,
+        VkCommandPool commandPool,
+        VkQueue transferQueue,
+        const unsigned char* pixels,
+        int width, int height
+    );
+
+    TextureImage(
+        VkDevice device,
         VkPhysicalDevice physicalDevice
     );
 

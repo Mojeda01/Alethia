@@ -260,6 +260,18 @@ TextureImage::TextureImage(
 }
 
 TextureImage::TextureImage(VkDevice dev,
+                            VkPhysicalDevice physicalDevice,
+                            VkCommandPool commandPool,
+                            VkQueue transferQueue,
+                            const unsigned char* pixels,
+                            int width, int height){
+    if (!pixels || width <= 0 || height <= 0) {
+        throw std::invalid_argument("TextureImage: invalid pixel data");
+    }
+    createFromPixels(dev, physicalDevice, commandPool, transferQueue, pixels, width, height);
+}
+
+TextureImage::TextureImage(VkDevice dev,
                            VkPhysicalDevice physicalDevice) {
     device = dev;
 
