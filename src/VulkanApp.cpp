@@ -1,5 +1,6 @@
 #include "VulkanApp.h"
 #include "Vertex.h"
+#include "GizmoMesh.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_TO_ONE
@@ -27,6 +28,8 @@ static std::vector<Vertex> makeGridQuad() {
     return verts;
 }
 
+static GizmoGeometry gizmoGeometry = makeGizmoMesh();
+
 VulkanApp::VulkanApp(int width, int height, const char* title)
     : window(width, height, title)
     , instance()
@@ -50,6 +53,13 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     commandPool.get(),
                     device.graphicsQueue(),
                     makeGridQuad())
+    , gizmo(device.get(), swapchainBundle.renderPass())     
+    , gizmoMesh(    device.get(),
+                    device.physical(),
+                    commandPool.get(),
+                    device.graphicsQueue(),
+                    gizmoGeometry.vertices,  
+                    gizmoGeometry.indices)
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size())
     , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 1000.0f) 
@@ -324,6 +334,55 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     VkBuffer gridVb = gridMesh.vertexBuffer();
     vkCmdBindVertexBuffers(cmd, 0, 1, &gridVb, &offset);
     vkCmdDraw(cmd, 6, 1, 0, 0);
+    
+    // Gizmo code
+    {
+        VkExtent2D ext = swapchainBundle.extent();
+        const uint32_t GIZMO_SIZE = 120;
+
+        VkViewport gizmoViewport{};
+        gizmoViewport.x      = static_cast<float>(ext.width - GIZMO_SIZE);
+        gizmoViewport.y      = 0.0f;
+        gizmoViewport.width  = static_cast<float>(GIZMO_SIZE);
+        gizmoViewport.height = static_cast<float>(GIZMO_SIZE);
+        gizmoViewport.minDepth = 0.0f;
+        gizmoViewport.maxDepth = 1.0f;
+        vkCmdSetViewport(cmd, 0, 1, &gizmoViewport);
+
+        VkRect2D gizmoScissor{};
+        gizmoScissor.offset = { static_cast<int32_t>(ext.width - GIZMO_SIZE), 0 };
+        gizmoScissor.extent = { GIZMO_SIZE, GIZMO_SIZE };
+        vkCmdSetScissor(cmd, 0, 1, &gizmoScissor); 
+        
+        glm::mat4 rotOnlyView = glm::mat4(glm::mat3(camera.viewMatrix()));
+        rotOnlyView[3][2] = -2.0f;
+        glm::mat4 gizmoProj = glm::ortho(-1.2f, 1.2f, 1.2f, -1.2f, 0.1f, 10.0f);
+
+        GizmoRenderer::PushConstants pc{};
+        pc.view       = rotOnlyView;
+        pc.projection = gizmoProj;
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gizmo.getPipeline());
+        vkCmdPushConstants(cmd, gizmo.getPipelineLayout(),
+                            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GizmoRenderer::PushConstants), &pc);
+
+        VkBuffer gizmoVb = gizmoMesh.vertexBuffer();
+        vkCmdBindVertexBuffers(cmd, 0, 1, &gizmoVb, &offset);
+        VkBuffer gizmoIb = gizmoMesh.indexBuffer();
+        vkCmdBindIndexBuffer(cmd, gizmoIb, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(cmd, gizmoMesh.indexCount(), 1, 0, 0, 0);
+        
+        VkViewport fullViewport{};
+        fullViewport.width    = static_cast<float>(ext.width);
+        fullViewport.height   = static_cast<float>(ext.height);
+        fullViewport.minDepth = 0.0f;
+        fullViewport.maxDepth = 1.0f;
+        vkCmdSetViewport(cmd, 0, 1, &fullViewport);
+
+        VkRect2D fullScissor{};
+        fullScissor.extent = ext;
+        vkCmdSetScissor(cmd, 0, 1, &fullScissor);
+    }
 
     imgui.render(cmd);
     vkCmdEndRenderPass(cmd);

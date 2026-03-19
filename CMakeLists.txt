@@ -59,7 +59,25 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV} ${GRID_VERT_SPV} ${GRID_FRAG_SPV})
+set(GIZMO_VERT_SPV ${SHADER_BIN_DIR}/gizmo.vert.spv)
+set(GIZMO_FRAG_SPV ${SHADER_BIN_DIR}/gizmo.frag.spv)
+
+add_custom_command(
+    OUTPUT ${GIZMO_VERT_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/gizmo.vert -o ${GIZMO_VERT_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/gizmo.vert
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${GIZMO_FRAG_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/gizmo.frag -o ${GIZMO_FRAG_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/gizmo.frag
+    VERBATIM
+)
+
+add_custom_target(
+    VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV} ${GRID_VERT_SPV} ${GRID_FRAG_SPV} ${GIZMO_VERT_SPV} ${GIZMO_FRAG_SPV})
 
 add_library(VulkanTriangle STATIC
     src/triangle/TriangleRenderer.cpp
@@ -91,7 +109,9 @@ add_executable(VulkanLab
     src/ObjLoader.cpp
     src/TextureImage.cpp 
     src/ImGuiLayer.cpp
-    src/DebugUI.cpp 
+    src/DebugUI.cpp
+    src/GizmoRenderer.cpp
+    src/GizmoMesh.cpp
     src/external/imgui/imgui.cpp
     src/external/imgui/imgui_draw.cpp
     src/external/imgui/imgui_tables.cpp
@@ -101,6 +121,7 @@ add_executable(VulkanLab
     src/external/imgui/imgui_impl_vulkan.cpp
 )
 
+target_compile_definitions(VulkanLab PRIVATE VULKANLAB_SHADER_DIR="${SHADER_BIN_DIR}")
 add_dependencies(VulkanLab VulkanLabShaders)
 target_include_directories(VulkanLab PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/external/imgui)
 target_link_libraries(VulkanLab PRIVATE Vulkan::Vulkan glfw VulkanTriangle)

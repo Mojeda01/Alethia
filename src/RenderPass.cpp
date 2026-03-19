@@ -51,8 +51,8 @@ RenderPass::RenderPass(VkDevice dev, VkFormat colorFormat, VkFormat depthFormat)
                       | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
     VkRenderPassCreateInfo ci{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-    ci.attachmentCount = 1;
-    ci.pAttachments = &color;
+    ci.attachmentCount = static_cast<uint32_t>(attachments.size());
+    ci.pAttachments = attachments.data();
     ci.subpassCount = 1;
     ci.pSubpasses = &subpass;
     ci.dependencyCount = 1;

@@ -18,6 +18,8 @@
 #include "DebugUI.h"
 #include "GridRenderer.h"
 #include "triangle/TriangleRenderer.h"
+#include "GizmoRenderer.h"
+#include "GizmoMesh.h"
 
 #include <chrono>
 #include <cstdint>
@@ -46,6 +48,8 @@ private:
     GridRenderer grid;
     CommandPool commandPool;
     MeshBuffer gridMesh;
+    GizmoRenderer gizmo;
+    MeshBuffer gizmoMesh;
     FrameSync sync;
     Camera camera;
     ImGuiLayer imgui;
