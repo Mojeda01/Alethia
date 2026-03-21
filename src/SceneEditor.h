@@ -13,7 +13,8 @@ public:
     enum class Tool : uint8_t {
         Place,
         Select,
-        Slice
+        Slice,
+        Move
     };
 
     SceneEditor() = default;
@@ -66,4 +67,7 @@ private:
     int sliceAxis = -1;
     bool sliceActive = false;
     float slicePosition = 0.0f;
+
+    bool moving = false;
+    glm::vec3 moveOffset{0.0f};
 };

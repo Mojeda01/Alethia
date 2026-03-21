@@ -327,8 +327,44 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                     }
                 }
             }
-        } 
+        }
+        else if (tool == Tool::Move) {
+            if (selected < 0) {
+                tool = Tool::Select;
+                Log::warn("No cube selected — switching to Select");
+            } else {
+                if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                    AABB& sel = cubes[selected];
+                    glm::vec3 center = sel.center();
+                    moveOffset = glm::vec3(center.x - snappedX, 0.0f, center.z - snappedZ);
+                    moving = true;
+                } 
+                if (moving && input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                    AABB& sel = cubes[selected];
+                    glm::vec3 sz = sel.size();
+                    float newCenterX = snappedX + moveOffset.x;
+                    float newCenterZ = snappedZ + moveOffset.z;
+                    newCenterX = snapValue(newCenterX);
+                    newCenterZ = snapValue(newCenterZ);
 
+                    sel.min.x = newCenterX - sz.x * 0.5f;
+                    sel.max.x = newCenterX + sz.x * 0.5f;
+                    sel.min.z = newCenterZ - sz.z * 0.5f;
+                    sel.max.z = newCenterZ + sz.z * 0.5f;
+                }
+
+                if (moving && !input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                    Log::info("Cube moved");
+                    moving = false;
+                }
+
+                if (input.wasKeyJustPressed(GLFW_KEY_ESCAPE)) {
+                    moving = false;
+                    tool = Tool::Select;
+                    Log::info("Move cancelled");
+                }
+            }
+        }
 
     if (input.wasKeyJustPressed(GLFW_KEY_1)) {
         tool = Tool::Place;
@@ -350,18 +386,31 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             Log::warn("Select a cube first before slicing");
         }
     }
+    if (input.wasKeyJustPressed(GLFW_KEY_4)) {
+        if (selected >= 0) {
+            tool = Tool::Move;
+            moving = false;
+            Log::info("Tool: Move");
+        } else {
+            Log::warn("Select a cube first before moving");
+        }
+    }
 }
 
 void SceneEditor::drawUI() {
-    const char* toolNames[] = { "Place", "Select", "Slice" };
+    const char* toolNames[] = { "Place", "Select", "Slice", "Move"};
     int toolIdx = static_cast<int>(tool);
-    if (ImGui::Combo("Tool", &toolIdx, toolNames, 3)) {
+    if (ImGui::Combo("Tool", &toolIdx, toolNames, 4)) {
         tool = static_cast<Tool>(toolIdx);
         if (tool == Tool::Place) selected = -1;
         if (tool == Tool::Select) dragging = false;
         if (tool == Tool::Slice && selected < 0){
             tool = Tool::Select;
             Log::warn("Select a cube first before slicing");
+        }
+        if (tool == Tool::Move && selected < 0) {
+            tool = Tool::Select;
+            Log::warn("Select a cube first before moving");
         }
     }
     ImGui::SliderFloat("Snap", &gridSnap, 0.125f, 4.0f, "%.3f");
@@ -416,5 +465,5 @@ void SceneEditor::drawUI() {
         Log::info("All cubes cleared");
     }
     ImGui::Separator();
-    ImGui::Text("[1] Place  [2] Select [3] Slice  [Del] Delete");
+    ImGui::Text("[1] Place  [2] Select [3] Slice [4] Move  [Del] Delete");
 }
