@@ -30,7 +30,7 @@ model with 405 materials and 383 textures.
 
 
 ![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
-![Alethia Screenshot](screenshots/alethia_3.png)
+![Alethia Screenshot](screenshots/alethia_4.png)
 
 ## Requirements
 
