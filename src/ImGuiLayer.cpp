@@ -42,7 +42,7 @@ ImGuiLayer::ImGuiLayer(GLFWwindow* window,
 
     ImGui::StyleColorsDark();
 
-    ImGui_ImplGlfw_InitForVulkan(window, true);
+    ImGui_ImplGlfw_InitForVulkan(window, false);
 
     ImGui_ImplVulkan_InitInfo initInfo{};
     initInfo.Instance = instance;

@@ -110,6 +110,7 @@ add_executable(VulkanLab
     src/TextureImage.cpp 
     src/ImGuiLayer.cpp
     src/DebugUI.cpp
+    src/InputManager.cpp
     src/GizmoRenderer.cpp
     src/GizmoMesh.cpp
     src/CubeMesh.cpp

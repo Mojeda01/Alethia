@@ -36,6 +36,7 @@ static CubeGeometry cubeGeometry = makeCube(1.0f);
 
 VulkanApp::VulkanApp(int width, int height, const char* title)
     : window(width, height, title)
+    , input(window.get())
     , instance()
     , surface(instance.get(), window.get())
     , device(instance.get(), surface.get())
@@ -86,16 +87,6 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                 swapchainBundle.renderPass(),
                 static_cast<uint32_t>(swapchainBundle.framebuffers().size()))
 {
-    glfwSetWindowUserPointer(window.get(), this);
-    glfwSetFramebufferSizeCallback(window.get(), VulkanApp::framebufferResizeCallback);
-    glfwSetCursorPosCallback(window.get(), VulkanApp::cursorPosCallback);
-    glfwSetMouseButtonCallback(window.get(), VulkanApp::mouseButtonCallback); 
-    glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    if (glfwRawMouseMotionSupported()) {
-        glfwSetInputMode(window.get(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-    }
-
     auto now = std::chrono::steady_clock::now();
     startTime = now;
     lastFrameTime = now;
@@ -147,24 +138,23 @@ void VulkanApp::run() {
     while (!window.shouldClose()) {
         window.pollEvents();
 
-        if (glfwGetKey(window.get(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        if (input.isKeyPressed(GLFW_KEY_ESCAPE)) {
             glfwSetWindowShouldClose(window.get(), GLFW_TRUE);
             continue;
         }
 
-        static bool tabWasPressed = false;
-        bool tabPressed = glfwGetKey(window.get(), GLFW_KEY_TAB) == GLFW_PRESS;
-        if (tabPressed && !tabWasPressed) {
-            uiMode = !uiMode;
-            if (uiMode) {
-                glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            } else {
-                glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                firstMouse = true;
+        if (input.inUIMode() && input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+            if (!input.imguiWantsMouse()) {
+                glm::vec3 hit = raycastGrid(input.mouseX(), input.mouseY());
+                if (hit.y > -9999.0f) {
+                    float snappedX = std::floor(hit.x) + 0.5f;
+                    float snappedZ = std::floor(hit.z) + 0.5f;
+                    cubePositions.push_back(glm::vec3(snappedX, 0.5f, snappedZ));
+                }
             }
         }
-        tabWasPressed = tabPressed;
 
+        input.update();
         drawFrame();
     }
     vkDeviceWaitIdle(device.get());
@@ -174,54 +164,6 @@ void VulkanApp::cleanup() {
     // nothing yet.
 }
 
-void VulkanApp::framebufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/) {
-    auto* app = reinterpret_cast<VulkanApp*>(glfwGetWindowUserPointer(window));
-    if (app) {
-        app->framebufferResized = true;
-    }
-}
-
-void VulkanApp::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
-    auto* app = reinterpret_cast<VulkanApp*>(glfwGetWindowUserPointer(window));
-    if (!app) return;
-
-    if (app->uiMode) return;
-
-    if (app->firstMouse) {
-        app->lastMouseX = xpos;
-        app->lastMouseY = ypos;
-        app->firstMouse = false;
-        return;
-    }
-
-    double xOffset = xpos - app->lastMouseX;
-    double yOffset = ypos - app->lastMouseY;
-    app->lastMouseX = xpos;
-    app->lastMouseY = ypos;
-
-    app->camera.processMouse(xOffset, yOffset);
-}
-
-void VulkanApp::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) { 
-    (void)mods;
-    auto* app = reinterpret_cast<VulkanApp*>(glfwGetWindowUserPointer(window));
-    if(!app) return;
-    if(!app->uiMode) return;
-
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureMouse) return;
-
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-        double mx, my;
-        glfwGetCursorPos(window, &mx, &my);
-        glm::vec3 hit = app->raycastGrid(mx, my);
-        if (hit.y > -9999.0f) {
-            float snappedX = std::floor(hit.x) + 0.5f;
-            float snappedZ = std::floor(hit.z) + 0.5f;
-            app->cubePositions.push_back(glm::vec3(snappedX, 0.5f, snappedZ));
-        }
-    }
-}
 
 glm::vec3 VulkanApp::raycastGrid(double mouseX, double mouseY) const {
     int width, height;
@@ -262,8 +204,8 @@ glm::vec3 VulkanApp::raycastGrid(double mouseX, double mouseY) const {
 void VulkanApp::drawFrame(){
     VkDevice dev = device.get();
 
-    if (framebufferResized) {
-        framebufferResized = false;
+    if (input.framebufferWasResized()) {
+        input.clearFramebufferResized();
         recreateSwapchain();
         return;
     }
@@ -310,8 +252,9 @@ void VulkanApp::drawFrame(){
     frameTimes[frameTimeIndex] = deltaSeconds * 1000.0f;
     frameTimeIndex = (frameTimeIndex + 1) % FRAME_TIME_COUNT;
 
-    if (!uiMode) {
+    if (!input.inUIMode()) {
         camera.processKeyboard(window.get(), deltaSeconds);
+        camera.processMouse(input.mouseDeltaX(), input.mouseDeltaY());
     }
 
     imgui.newFrame();
@@ -360,8 +303,8 @@ void VulkanApp::drawFrame(){
     present.pImageIndices = &imageIndex;
 
     r = vkQueuePresentKHR(device.presentQueue(), &present);
-    if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR || framebufferResized || suboptimal) {
-        framebufferResized = false;
+    if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR || input.framebufferWasResized() || suboptimal){
+        input.clearFramebufferResized();
         recreateSwapchain();
         return;
     } else if (r != VK_SUCCESS) {
