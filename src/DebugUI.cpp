@@ -13,7 +13,7 @@ void DebugUI::draw() {
     ImGui::Begin("Alethia Debug", &visible, ImGuiWindowFlags_NoCollapse);
 
     for (auto& panel : panels) {
-        if (ImGui::CollapsingHeader(panel.name.c_str(), &panel.open, ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::CollapsingHeader(panel.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) { 
             panel.drawFn();
         }
     }

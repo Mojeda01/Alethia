@@ -111,6 +111,7 @@ add_executable(VulkanLab
     src/ImGuiLayer.cpp
     src/DebugUI.cpp
     src/Log.cpp
+    src/SceneEditor.cpp
     src/InputManager.cpp
     src/GizmoRenderer.cpp
     src/GizmoMesh.cpp

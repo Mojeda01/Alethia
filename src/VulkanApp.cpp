@@ -115,13 +115,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     });
 
     debugUI.addPanel("Scene", [this]() {
-        ImGui::Text("Grid: 1000x1000 units");
-        ImGui::SliderFloat("Snap", &gridSnap, 0.125f, 4.0f, "%.3f"); 
-        ImGui::Separator();
-        ImGui::Text("Cubes: %zu", cubes.size()); 
-        if (ImGui::Button("Clear All Cubes")) {
-            cubes.clear();
-        }
+    
     });
 
     debugUI.addPanel("Lighting", [this]() {
@@ -141,25 +135,12 @@ void VulkanApp::run() {
     while (!window.shouldClose()) {
         window.pollEvents();
 
-        if (input.isKeyPressed(GLFW_KEY_ESCAPE)) {
+        if (input.isKeyPressed(GLFW_KEY_ESCAPE)){ 
             glfwSetWindowShouldClose(window.get(), GLFW_TRUE);
             continue;
         }
 
-        if (input.inUIMode() && input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
-            if (!input.imguiWantsMouse()) {
-                glm::vec3 hit = raycastGrid(input.mouseX(), input.mouseY());
-                if (hit.y > -9999.0f) {
-                    float snappedX = std::round(hit.x / gridSnap) * gridSnap;
-                    float snappedZ = std::round(hit.z / gridSnap) * gridSnap;
-                    AABB cube = AABB::unitCubeAt(glm::vec3(snappedX, 0.0f, snappedZ), gridSnap);
-                    Log::info("Cube placed at (" + std::to_string(snappedX) + ", 0, " + std::to_string(snappedZ) + ")");
-                    cubes.push_back(cube);
-                } else {
-                    Log::warn("Raycast missed grid plane");
-                }
-            }
-        }
+        editor.update(input, camera, window.get());
 
         input.update();
         drawFrame();
@@ -368,9 +349,74 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     VkBuffer gridVb = gridMesh.vertexBuffer();
     vkCmdBindVertexBuffers(cmd, 0, 1, &gridVb, &offset);
     vkCmdDraw(cmd, 6, 1, 0, 0);
+    
+    const auto& editorCubes = editor.getCubes();
+
+    if (editor.hasHighlight()) {
+        VkPipeline scenePipeline = triangle.getPipeline();
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
+
+        VkDescriptorSet sceneDs = uniformBuffer.descriptorSet(imageIndex);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
+                                    0, 1, &sceneDs, 0, nullptr);
+        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
+        VkDeviceSize cubeOffset = 0;
+        VkBuffer cubeVb = cubeMesh.vertexBuffer();
+        vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &cubeOffset);
+        VkBuffer cubeIb = cubeMesh.indexBuffer();
+        vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
+
+        glm::vec3 hlMin = editor.highlightMin();
+        glm::vec3 hlMax = editor.highlightMax();
+        glm::vec3 hlCenter = (hlMin + hlMax) * 0.5f;
+        glm::vec3 hlSize = hlMax - hlMin;
+        if (hlSize.y < 0.02f) hlSize.y = 0.02f;
+
+        UniformBuffer::MVPData hlMvp{};
+        hlMvp.model = glm::translate(glm::mat4(1.0f), hlCenter) *
+                        glm::scale(glm::mat4(1.0f), hlSize);
+        hlMvp.view = camera.viewMatrix();
+        hlMvp.projection = camera.projectionMatrix();
+        hlMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
+        hlMvp.viewPos = glm::vec4(camera.position(), 1.0f);
+        uniformBuffer.update(imageIndex, hlMvp);
+        vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+    }
+
+    if (editor.hasPreview()) { 
+        VkPipeline scenePipeline = triangle.getPipeline();
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
+
+        VkDescriptorSet sceneDs = uniformBuffer.descriptorSet(imageIndex);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
+                                0, 1, &sceneDs, 0, nullptr);
+        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                             0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
+        VkDeviceSize cubeOffset = 0;
+        VkBuffer cubeVb = cubeMesh.vertexBuffer();
+        vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &cubeOffset);
+        VkBuffer cubeIb = cubeMesh.indexBuffer();
+        vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
+
+        AABB pv = editor.previewAABB();
+        glm::vec3 pvCenter = pv.center();
+        glm::vec3 pvSize = pv.size();
+        UniformBuffer::MVPData pvMvp{};
+        pvMvp.model = glm::translate(glm::mat4(1.0f), pvCenter) *
+                        glm::scale(glm::mat4(1.0f), pvSize);
+        pvMvp.view = camera.viewMatrix();
+        pvMvp.projection = camera.projectionMatrix();
+        pvMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
+        pvMvp.viewPos = glm::vec4(camera.position(), 1.0f);
+        uniformBuffer.update(imageIndex, pvMvp);
+        vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+    }
 
     // Draw Cubes
-    if (!cubes.empty()) {
+    if (!editorCubes.empty()) {
         VkPipeline scenePipeline = wireframe ? triangle.getWireframePipeline() : triangle.getPipeline();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
 
@@ -388,7 +434,10 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
         VkBuffer cubeIb = cubeMesh.indexBuffer();
         vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
 
-        for (const auto& cube : cubes) {
+        
+       
+     for (int i = 0; i < static_cast<int>(editorCubes.size()); ++i) {
+            const AABB& cube = editorCubes[i];
             glm::vec3 center = cube.center();
             glm::vec3 sz = cube.size();
             UniformBuffer::MVPData cubeMvp{};
@@ -399,6 +448,12 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
             cubeMvp.viewPos = glm::vec4(camera.position(), 1.0f);
             uniformBuffer.update(imageIndex, cubeMvp);
             vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+
+            if (i == editor.selectedIndex()) {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getWireframePipeline());
+                vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
+            }
         }
     }
     
