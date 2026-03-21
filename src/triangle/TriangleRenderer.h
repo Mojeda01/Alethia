@@ -4,6 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <glm/glm.hpp>
+
+
+
 class TriangleRenderer {
 public:
     TriangleRenderer(VkDevice device, VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout);
@@ -18,6 +22,7 @@ public:
         float deltaSeconds = 0.0f;
         std::uint32_t frameIndex = 0;
         float pad = 0.0f;
+        glm::mat4 model = glm::mat4(1.0f);
     };
 
     void record(    VkCommandBuffer cmd,

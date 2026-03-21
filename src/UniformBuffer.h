@@ -10,8 +10,7 @@
 
 class UniformBuffer{
 public:
-    struct MVPData{
-        glm::mat4 model;
+    struct MVPData{ 
         glm::mat4 view;
         glm::mat4 projection;
         glm::vec4 lightPos;

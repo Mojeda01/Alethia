@@ -1,7 +1,6 @@
 #version 450
 
 layout(set = 0, binding = 0) uniform MVP {
-    mat4 model;
     mat4 view;
     mat4 projection;
     vec4 lightPos;
@@ -13,6 +12,7 @@ layout(push_constant) uniform Push {
     layout(offset = 4) float deltaSeconds;
     layout(offset = 8) uint frameIndex;
     layout(offset = 12) float pad;
+    layout(offset = 16) mat4 model;
 } pc;
 
 layout(location = 0) in vec3 inPosition;
@@ -27,11 +27,11 @@ layout(location = 3) out float vDist;
 layout(location = 4) out vec2 vTexCoord;
 
 void main() {
-    vec4 worldPos = mvp.model * vec4(inPosition, 1.0);
+    vec4 worldPos = pc.model * vec4(inPosition, 1.0); 
     gl_Position = mvp.projection * mvp.view * worldPos;
 
     vWorldPos = worldPos.xyz;
-    vNormal = mat3(mvp.model) * inNormal;
+    vNormal = mat3(pc.model) * inNormal; 
     vColor = inColor;
     vDist = length(mvp.viewPos.xyz - worldPos.xyz);
     vTexCoord = inTexCoord;

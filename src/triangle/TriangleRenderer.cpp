@@ -10,7 +10,7 @@
 #include <vector>
 #include <array>
 
-static_assert(sizeof(TriangleRenderer::PushConstants) == 16, "Push constants must be 16 bytes");
+static_assert(sizeof(TriangleRenderer::PushConstants) == 80, "Push constants must be 80 bytes");
 
 namespace{
 std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) {

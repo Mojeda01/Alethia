@@ -260,7 +260,6 @@ void VulkanApp::drawFrame(){
     ImGui::End();
 
     UniformBuffer::MVPData mvp{};
-    mvp.model = glm::mat4(1.0f);
     mvp.view = camera.viewMatrix();
     mvp.projection = camera.projectionMatrix();
     mvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
@@ -379,15 +378,13 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
         glm::vec3 hlCenter = (hlMin + hlMax) * 0.5f;
         glm::vec3 hlSize = hlMax - hlMin;
         if (hlSize.y < 0.02f) hlSize.y = 0.02f;
-
-        UniformBuffer::MVPData hlMvp{};
-        hlMvp.model = glm::translate(glm::mat4(1.0f), hlCenter) *
+        
+        TriangleRenderer::PushConstants hlPc = pushConstants;
+        hlPc.model = glm::translate(glm::mat4(1.0f), hlCenter) *
                         glm::scale(glm::mat4(1.0f), hlSize);
-        hlMvp.view = camera.viewMatrix();
-        hlMvp.projection = camera.projectionMatrix();
-        hlMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
-        hlMvp.viewPos = glm::vec4(camera.position(), 1.0f);
-        uniformBuffer.update(imageIndex, hlMvp);
+        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                            0, sizeof(TriangleRenderer::PushConstants), &hlPc);
         vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
     }
 
@@ -410,14 +407,14 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
         AABB pv = editor.previewAABB();
         glm::vec3 pvCenter = pv.center();
         glm::vec3 pvSize = pv.size();
-        UniformBuffer::MVPData pvMvp{};
-        pvMvp.model = glm::translate(glm::mat4(1.0f), pvCenter) *
+        
+        TriangleRenderer::PushConstants pvPc = pushConstants;
+        pvPc.model = glm::translate(glm::mat4(1.0f), pvCenter) *
                         glm::scale(glm::mat4(1.0f), pvSize);
-        pvMvp.view = camera.viewMatrix();
-        pvMvp.projection = camera.projectionMatrix();
-        pvMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
-        pvMvp.viewPos = glm::vec4(camera.position(), 1.0f);
-        uniformBuffer.update(imageIndex, pvMvp);
+        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                            0, sizeof(TriangleRenderer::PushConstants), &pvPc);
+
         vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
     }
 
@@ -446,13 +443,12 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
             const AABB& cube = editorCubes[i];
             glm::vec3 center = cube.center();
             glm::vec3 sz = cube.size();
-            UniformBuffer::MVPData cubeMvp{};
-            cubeMvp.model = glm::translate(glm::mat4(1.0f), center) * glm::scale(glm::mat4(1.0f), sz); 
-            cubeMvp.view = camera.viewMatrix();
-            cubeMvp.projection = camera.projectionMatrix();
-            cubeMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
-            cubeMvp.viewPos = glm::vec4(camera.position(), 1.0f);
-            uniformBuffer.update(imageIndex, cubeMvp);
+            TriangleRenderer::PushConstants cubePc = pushConstants;
+            cubePc.model = glm::translate(glm::mat4(1.0f), center) *
+                            glm::scale(glm::mat4(1.0f), sz);
+            vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                0, sizeof(TriangleRenderer::PushConstants), &cubePc);
             vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
             
         }
@@ -472,8 +468,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
         lineBatch.upload();
 
         if (!lineBatch.empty()) {
-            UniformBuffer::MVPData lineMvp{};
-            lineMvp.model = glm::mat4(1.0f);
+            UniformBuffer::MVPData lineMvp{}; 
             lineMvp.view = camera.viewMatrix();
             lineMvp.projection = camera.projectionMatrix();
             lineMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
