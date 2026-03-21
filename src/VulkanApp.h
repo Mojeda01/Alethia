@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include "Window.h"
 #include "InputManager.h"
@@ -18,6 +18,8 @@
 #include "ImGuiLayer.h"
 #include "DebugUI.h"
 #include "GridRenderer.h"
+#include "LineRenderer.h"
+#include "LineBatch.h"
 #include "triangle/TriangleRenderer.h"
 #include "GizmoRenderer.h"
 #include "GizmoMesh.h"
@@ -55,12 +57,14 @@ private:
     UniformBuffer uniformBuffer;
     TriangleRenderer triangle;
     GridRenderer grid;
+    LineRenderer lineRenderer;
     CommandPool commandPool;
     MeshBuffer gridMesh;
     GizmoRenderer gizmo;
     MeshBuffer gizmoMesh;
     MeshBuffer cubeMesh;
     DevTexture devTexture;
+    LineBatch lineBatch;
     SceneEditor editor; 
     FrameSync sync;
     Camera camera;

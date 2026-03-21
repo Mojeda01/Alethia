@@ -3,6 +3,7 @@
 #include "GizmoMesh.h"
 #include "CubeMesh.h"
 #include "Log.h"
+#include "SceneEditor.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_TO_ONE
@@ -51,6 +52,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                         (uint32_t)swapchainBundle.framebuffers().size())
     , triangle(device.get(), swapchainBundle.renderPass(), uniformBuffer.descriptorSetLayout())
     , grid(device.get(), swapchainBundle.renderPass(), uniformBuffer.descriptorSetLayout())
+    , lineRenderer(device.get(), swapchainBundle.renderPass(), uniformBuffer.descriptorSetLayout())
     , commandPool(  device.get(),
                     device.graphicsQueueFamily(),
                     swapchainBundle.framebuffers().size())
@@ -73,6 +75,10 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     cubeGeometry.vertices,
                     cubeGeometry.indices)
     , devTexture(   device.get(),
+                    device.physical(),
+                    commandPool.get(),
+                    device.graphicsQueue())
+    , lineBatch(    device.get(),
                     device.physical(),
                     commandPool.get(),
                     device.graphicsQueue())
@@ -352,7 +358,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     
     const auto& editorCubes = editor.getCubes();
 
-    if (editor.hasHighlight()) {
+    if (editor.hasHighlight() && editor.activeTool() == SceneEditor::Tool::Place) { 
         VkPipeline scenePipeline = triangle.getPipeline();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
 
@@ -385,7 +391,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
         vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
     }
 
-    if (editor.hasPreview()) { 
+    if (editor.hasPreview() && editor.activeTool() == SceneEditor::Tool::Place) { 
         VkPipeline scenePipeline = triangle.getPipeline();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
 
@@ -448,12 +454,40 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
             cubeMvp.viewPos = glm::vec4(camera.position(), 1.0f);
             uniformBuffer.update(imageIndex, cubeMvp);
             vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+            
+        }
+    }
 
-            if (i == editor.selectedIndex()) {
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getWireframePipeline());
-                vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
-            }
+    // Draw selection lines
+    {
+        lineBatch.clear();
+        int sel = editor.selectedIndex();
+        if (sel >= 0 && sel < static_cast<int>(editorCubes.size())) {
+            const AABB& box = editorCubes[sel];
+            glm::vec3 red(1.0f, 0.3f, 0.3f);
+            glm::vec3 green(0.3f, 1.0f, 0.3f);
+            glm::vec3 blue(0.3f, 0.3f, 1.0f);
+            lineBatch.addAABBEdges(box.min, box.max, red, green, blue);
+        }
+        lineBatch.upload();
+
+        if (!lineBatch.empty()) {
+            UniformBuffer::MVPData lineMvp{};
+            lineMvp.model = glm::mat4(1.0f);
+            lineMvp.view = camera.viewMatrix();
+            lineMvp.projection = camera.projectionMatrix();
+            lineMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
+            lineMvp.viewPos = glm::vec4(camera.position(), 1.0f);
+            uniformBuffer.update(imageIndex, lineMvp);
+
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lineRenderer.getPipeline());
+            VkDescriptorSet lineDs = uniformBuffer.descriptorSet(imageIndex);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lineRenderer.getPipelineLayout(),
+                                    0, 1, &lineDs, 0, nullptr);
+            VkDeviceSize lineOffset = 0;
+            VkBuffer lineBuf = lineBatch.buffer();
+            vkCmdBindVertexBuffers(cmd, 0, 1, &lineBuf, &lineOffset);
+            vkCmdDraw(cmd, lineBatch.vertexCount(), 1, 0, 0);
         }
     }
     

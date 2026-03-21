@@ -76,12 +76,30 @@ add_custom_command(
     VERBATIM
 )
 
+set(LINE_VERT_SPV ${SHADER_BIN_DIR}/line.vert.spv)
+set(LINE_FRAG_SPV ${SHADER_BIN_DIR}/line.frag.spv)
+
+add_custom_command(
+    OUTPUT ${LINE_VERT_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/line.vert -o ${LINE_VERT_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/line.vert
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${LINE_FRAG_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/line.frag -o ${LINE_FRAG_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/line.frag
+    VERBATIM
+)
+
 add_custom_target(
-    VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV} ${GRID_VERT_SPV} ${GRID_FRAG_SPV} ${GIZMO_VERT_SPV} ${GIZMO_FRAG_SPV})
+    VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV} ${GRID_VERT_SPV} ${GRID_FRAG_SPV} ${GIZMO_VERT_SPV} ${GIZMO_FRAG_SPV} ${LINE_VERT_SPV} ${LINE_FRAG_SPV})
 
 add_library(VulkanTriangle STATIC
     src/triangle/TriangleRenderer.cpp
     src/GridRenderer.cpp
+    src/LineRenderer.cpp
 )
 target_compile_definitions(VulkanTriangle PRIVATE VULKANLAB_SHADER_DIR="${SHADER_BIN_DIR}")
 target_include_directories(VulkanTriangle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -112,6 +130,7 @@ add_executable(VulkanLab
     src/DebugUI.cpp
     src/Log.cpp
     src/SceneEditor.cpp
+    src/LineBatch.cpp
     src/InputManager.cpp
     src/GizmoRenderer.cpp
     src/GizmoMesh.cpp

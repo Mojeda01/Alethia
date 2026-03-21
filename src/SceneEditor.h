@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include "AABB.h"
 #include "InputManager.h"
@@ -8,7 +8,7 @@
 #include <vector>
 #include <cstdint>
 
-class SceneEditor{
+class SceneEditor {
 public:
     enum class Tool : uint8_t {
         Place,
@@ -26,13 +26,21 @@ public:
     bool hasHighlight() const { return highlightValid; }
     glm::vec3 highlightMin() const { return highlightCellMin; }
     glm::vec3 highlightMax() const { return highlightCellMax; }
-    
+
     bool hasPreview() const { return dragging; }
     AABB previewAABB() const { return preview; }
     float getGridSnap() const { return gridSnap; }
     Tool activeTool() const { return tool; }
+
+    bool isDraggingFace() const { return dragFace >= 0; }
+    int activeDragFace() const { return dragFace; }
+
 private:
     glm::vec3 raycastGrid(const InputManager& input, const Camera& camera, GLFWwindow* window) const;
+    glm::vec3 worldRayDir(const InputManager& input, const Camera& camera, GLFWwindow* window) const;
+    glm::vec3 worldRayOrigin(const Camera& camera) const;
+    int hitTestCube(const glm::vec3& rayOrigin, const glm::vec3& rayDir, int cubeIndex, float& outT) const;
+    int hitTestFace(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outT) const;
     float snapValue(float val) const;
 
     std::vector<AABB> cubes;
@@ -43,8 +51,10 @@ private:
     bool highlightValid = false;
     glm::vec3 highlightCellMin{0.0f};
     glm::vec3 highlightCellMax{0.0f};
-    
+
     bool dragging = false;
     glm::vec3 dragStart{0.0f};
     AABB preview{};
+
+    int dragFace = -1;
 };
