@@ -116,11 +116,11 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 
     debugUI.addPanel("Scene", [this]() {
         ImGui::Text("Grid: 1000x1000 units");
-        ImGui::Text("Grid spacing: 1m / 10m");
+        ImGui::SliderFloat("Snap", &gridSnap, 0.125f, 4.0f, "%.3f"); 
         ImGui::Separator();
-        ImGui::Text("Cubes: %zu", cubePositions.size());
+        ImGui::Text("Cubes: %zu", cubes.size()); 
         if (ImGui::Button("Clear All Cubes")) {
-            cubePositions.clear();
+            cubes.clear();
         }
     });
 
@@ -150,10 +150,11 @@ void VulkanApp::run() {
             if (!input.imguiWantsMouse()) {
                 glm::vec3 hit = raycastGrid(input.mouseX(), input.mouseY());
                 if (hit.y > -9999.0f) {
-                    float snappedX = std::floor(hit.x) + 0.5f;
-                    float snappedZ = std::floor(hit.z) + 0.5f;
-                    Log::info("Cube placed at (" + std::to_string(snappedX) + ", 0.5, " + std::to_string(snappedZ) + ")");
-                    cubePositions.push_back(glm::vec3(snappedX, 0.5f, snappedZ));
+                    float snappedX = std::round(hit.x / gridSnap) * gridSnap;
+                    float snappedZ = std::round(hit.z / gridSnap) * gridSnap;
+                    AABB cube = AABB::unitCubeAt(glm::vec3(snappedX, 0.0f, snappedZ), gridSnap);
+                    Log::info("Cube placed at (" + std::to_string(snappedX) + ", 0, " + std::to_string(snappedZ) + ")");
+                    cubes.push_back(cube);
                 } else {
                     Log::warn("Raycast missed grid plane");
                 }
@@ -172,17 +173,18 @@ void VulkanApp::cleanup() {
 
 
 glm::vec3 VulkanApp::raycastGrid(double mouseX, double mouseY) const {
-    int width, height;
-    glfwGetFramebufferSize(window.get(), &width, &height);
+    int winW, winH;
+    glfwGetWindowSize(window.get(), &winW, &winH);
 
-    float ndcX = (2.0f * static_cast<float>(mouseX)) / static_cast<float>(width) - 1.0f;
-    float ndcY = 1.0f - (2.0f * static_cast<float>(mouseY)) / static_cast<float>(height) - 1.0f;
+    float ndcX = (2.0f * static_cast<float>(mouseX)) / static_cast<float>(winW) - 1.0f;
+    float ndcY = 1.0f - (2.0f * static_cast<float>(mouseY)) / static_cast<float>(winH);
 
     glm::vec4 clipNear(ndcX, ndcY, 0.0f, 1.0f);
     glm::vec4 clipFar(ndcX, ndcY, 1.0f, 1.0f);
-    glfwGetFramebufferSize(window.get(), &width, &height);
 
-    glm::mat4 invProj = glm::inverse(camera.projectionMatrix());
+    glm::mat4 proj = camera.projectionMatrix();
+    proj[1][1] *= -1.0f;
+    glm::mat4 invProj = glm::inverse(proj);
     glm::mat4 invView = glm::inverse(camera.viewMatrix());
 
     glm::vec4 viewNear = invProj * clipNear;
@@ -368,7 +370,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
     vkCmdDraw(cmd, 6, 1, 0, 0);
 
     // Draw Cubes
-    if (!cubePositions.empty()) {
+    if (!cubes.empty()) {
         VkPipeline scenePipeline = wireframe ? triangle.getWireframePipeline() : triangle.getPipeline();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
 
@@ -386,9 +388,11 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
         VkBuffer cubeIb = cubeMesh.indexBuffer();
         vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
 
-        for (const auto& pos : cubePositions) {
+        for (const auto& cube : cubes) {
+            glm::vec3 center = cube.center();
+            glm::vec3 sz = cube.size();
             UniformBuffer::MVPData cubeMvp{};
-            cubeMvp.model = glm::translate(glm::mat4(1.0f), pos);
+            cubeMvp.model = glm::translate(glm::mat4(1.0f), center) * glm::scale(glm::mat4(1.0f), sz); 
             cubeMvp.view = camera.viewMatrix();
             cubeMvp.projection = camera.projectionMatrix();
             cubeMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);

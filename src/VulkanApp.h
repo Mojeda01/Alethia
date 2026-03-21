@@ -23,6 +23,7 @@
 #include "GizmoMesh.h"
 #include "CubeMesh.h"
 #include "DevTexture.h"
+#include "AABB.h"
 
 #include <chrono>
 #include <cstdint>
@@ -59,7 +60,8 @@ private:
     MeshBuffer gizmoMesh;
     MeshBuffer cubeMesh;
     DevTexture devTexture;
-    std::vector<glm::vec3> cubePositions;
+    std::vector<AABB> cubes;
+    float gridSnap = 1.0f;
     FrameSync sync;
     Camera camera;
     ImGuiLayer imgui;
