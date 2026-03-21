@@ -115,7 +115,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     });
 
     debugUI.addPanel("Scene", [this]() {
-    
+        editor.drawUI(); 
     });
 
     debugUI.addPanel("Lighting", [this]() {

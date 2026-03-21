@@ -162,9 +162,36 @@ void SceneEditor::drawUI() {
     if (selected >= 0) {
         ImGui::Text("Selected: %d", selected);
         AABB& sel = cubes[selected];
-        ImGui::Text("Min: %.1f, %.1f, %.1f", sel.min.x, sel.min.y, sel.min.z);
-        ImGui::Text("Max: %.1f, %.1f, %.1f", sel.max.x, sel.max.y, sel.max.z);
-        ImGui::Text("Size: %.1f x %.1f x %.1f", sel.size().x, sel.size().y, sel.size().z);
+        glm::vec3 pos = sel.center();
+        glm::vec3 sz = sel.size();
+
+        if (ImGui::DragFloat3("Position", &pos.x, gridSnap, -500.0f, 500.0f, "%.2f")) {
+            glm::vec3 half = sz * 0.5f;
+            sel.min = pos - half;
+            sel.max = pos + half;
+        }
+
+        if (ImGui::DragFloat("Width (X)", &sz.x, gridSnap, gridSnap, 500.0f, "%.2f")) {
+            if (sz.x < gridSnap) sz.x = gridSnap;
+            float cx = sel.center().x;
+            sel.min.x = cx - sz.x * 0.5f;
+            sel.max.x = cx + sz.x * 0.5f;
+        }
+
+        if (ImGui::DragFloat("Height (Y)", &sz.y, gridSnap, gridSnap, 500.0f, "%.2f")) {
+            if (sz.y < gridSnap) sz.y = gridSnap;
+            sel.max.y = sel.min.y + sz.y;
+        }
+
+        if (ImGui::DragFloat("Depth (Z)", &sz.z, gridSnap, gridSnap, 500.0f, "%.2f")) {
+            if (sz.z < gridSnap) sz.z = gridSnap;
+            float cz = sel.center().z;
+            sel.min.z = cz - sz.z * 0.5f;
+            sel.max.z = cz + sz.z * 0.5f;
+        }
+        ImGui::Separator();
+        ImGui::Text("Min: %.2f, %.2f, %.2f", sel.min.x, sel.min.y, sel.min.z);
+        ImGui::Text("Max: %.2f, %.2f, %.2f", sel.max.x, sel.max.y, sel.max.z);
     }
     if (ImGui::Button("Clear All")) {
         cubes.clear();
