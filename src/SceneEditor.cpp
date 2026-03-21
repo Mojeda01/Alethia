@@ -251,6 +251,84 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             dragFace = -1;
         }
     }
+    else if (tool == Tool::Slice) {
+            if (selected < 0) {
+                tool = Tool::Select;
+                Log::warn("No cube selected — switching to Select");
+            } else {
+                glm::vec3 rayOrigin = worldRayOrigin(camera);
+                glm::vec3 rayDir = worldRayDir(input, camera, window);
+
+                if (!sliceActive) {
+                    if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                        float faceT = 0.0f;
+                        int face = hitTestFace(rayOrigin, rayDir, faceT);
+                        if (face >= 0) {
+                            sliceAxis = face / 2;
+                            sliceActive = true;
+                            const AABB& sel = cubes[selected];
+                            slicePosition = (sel.min[sliceAxis] + sel.max[sliceAxis]) * 0.5f;
+                            slicePosition = snapValue(slicePosition);
+                            const char* axNames[] = { "X", "Y", "Z" };
+                            Log::info(std::string("Slice axis: ") + axNames[sliceAxis]);
+                        }
+                    }
+                } else {
+                    glm::vec3 planeNormal(0.0f);
+                    if (sliceAxis == 1) {
+                        glm::vec3 camFlat = glm::normalize(glm::vec3(rayDir.x, 0.0f, rayDir.z));
+                        planeNormal = camFlat;
+                    } else {
+                        planeNormal[sliceAxis == 0 ? 2 : 0] = 1.0f;
+                    }
+
+                    const AABB& sel = cubes[selected];
+                    glm::vec3 facePoint(0.0f);
+                    facePoint[sliceAxis] = slicePosition;
+
+                    float denom = glm::dot(planeNormal, rayDir);
+                    if (std::abs(denom) > 0.001f) {
+                        float t = glm::dot(facePoint - rayOrigin, planeNormal) / denom;
+                        if (t > 0.0f) {
+                            glm::vec3 worldPoint = rayOrigin + rayDir * t;
+                            float newPos = snapValue(worldPoint[sliceAxis]);
+                            float minBound = sel.min[sliceAxis] + gridSnap;
+                            float maxBound = sel.max[sliceAxis] - gridSnap;
+                            if (newPos >= minBound && newPos <= maxBound) {
+                                slicePosition = newPos;
+                            }
+                        }
+                    }
+                    if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                        AABB cubeA = sel;
+                        AABB cubeB = sel;
+                        cubeA.max[sliceAxis] = slicePosition;
+                        cubeB.min[sliceAxis] = slicePosition;
+
+                        int oldSelected = selected;
+                        cubes.push_back(cubeA);
+                        cubes.push_back(cubeB);
+                        cubes.erase(cubes.begin() + oldSelected);
+
+                        Log::info("Cube sliced along " + std::string(1, "XYZ"[sliceAxis]) +
+                                " at " + std::to_string(slicePosition));
+
+                        selected = -1;
+                        sliceActive = false;
+                        sliceAxis = -1;
+                        tool = Tool::Select;
+                    }
+
+                    if (input.wasKeyJustPressed(GLFW_KEY_ESCAPE)) {
+                        sliceActive = false;
+                        sliceAxis = -1;
+                        tool = Tool::Select;
+                        Log::info("Slice cancelled");
+                    }
+                }
+            }
+        } 
+
 
     if (input.wasKeyJustPressed(GLFW_KEY_1)) {
         tool = Tool::Place;
@@ -262,15 +340,29 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
         dragging = false;
         Log::info("Tool: Select");
     }
+    if (input.wasKeyJustPressed(GLFW_KEY_3)) {
+        if (selected >= 0) {
+            tool = Tool::Slice;
+            sliceActive = false;
+            sliceAxis = -1;
+            Log::info("Tool: Slice");
+        } else {
+            Log::warn("Select a cube first before slicing");
+        }
+    }
 }
 
 void SceneEditor::drawUI() {
-    const char* toolNames[] = { "Place", "Select" };
+    const char* toolNames[] = { "Place", "Select", "Slice" };
     int toolIdx = static_cast<int>(tool);
-    if (ImGui::Combo("Tool", &toolIdx, toolNames, 2)) {
+    if (ImGui::Combo("Tool", &toolIdx, toolNames, 3)) {
         tool = static_cast<Tool>(toolIdx);
         if (tool == Tool::Place) selected = -1;
         if (tool == Tool::Select) dragging = false;
+        if (tool == Tool::Slice && selected < 0){
+            tool = Tool::Select;
+            Log::warn("Select a cube first before slicing");
+        }
     }
     ImGui::SliderFloat("Snap", &gridSnap, 0.125f, 4.0f, "%.3f");
     ImGui::Separator();
@@ -313,6 +405,10 @@ void SceneEditor::drawUI() {
             const char* faceNames[] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
             ImGui::Text("Dragging: %s face", faceNames[dragFace]);
         }
+        if (sliceActive){
+            const char* axNames[] = { "X", "Y", "Z" };
+            ImGui::Text("Slicing along %s at %.2f", axNames[sliceAxis], slicePosition);
+        }
     }
     if (ImGui::Button("Clear All")) {
         cubes.clear();
@@ -320,5 +416,5 @@ void SceneEditor::drawUI() {
         Log::info("All cubes cleared");
     }
     ImGui::Separator();
-    ImGui::Text("[1] Place  [2] Select  [Del] Delete");
+    ImGui::Text("[1] Place  [2] Select [3] Slice  [Del] Delete");
 }

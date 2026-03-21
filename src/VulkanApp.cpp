@@ -464,6 +464,42 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
             glm::vec3 green(0.3f, 1.0f, 0.3f);
             glm::vec3 blue(0.3f, 0.3f, 1.0f);
             lineBatch.addAABBEdges(box.min, box.max, red, green, blue);
+
+            if (editor.isSlicing()) {
+                int ax = editor.getSliceAxis();
+                float sp = editor.getSlicePosition();
+                glm::vec3 yellow(1.0f, 1.0f, 0.2f);
+
+                glm::vec3 c0 = box.min;
+                glm::vec3 c1 = box.min;
+                glm::vec3 c2 = box.max;
+                glm::vec3 c3 = box.max;
+
+                c0[ax] = sp; c1[ax] = sp; c2[ax] = sp; c3[ax] = sp;
+
+                if (ax == 0) {
+                    c1.y = box.max.y;
+                    c3.z = box.min.z;
+                    lineBatch.addLine(c0, c1, yellow);
+                    lineBatch.addLine(c1, c2, yellow);
+                    lineBatch.addLine(c2, c3, yellow);
+                    lineBatch.addLine(c3, c0, yellow);
+                } else if (ax == 1) {
+                    c1.x = box.max.x;
+                    c3.z = box.min.z;
+                    lineBatch.addLine(c0, c1, yellow);
+                    lineBatch.addLine(c1, c2, yellow);
+                    lineBatch.addLine(c2, c3, yellow);
+                    lineBatch.addLine(c3, c0, yellow);
+                } else {
+                    c1.x = box.max.x;
+                    c3.y = box.min.y;
+                    lineBatch.addLine(c0, c1, yellow);
+                    lineBatch.addLine(c1, c2, yellow);
+                    lineBatch.addLine(c2, c3, yellow);
+                    lineBatch.addLine(c3, c0, yellow);
+                }
+            }
         }
         lineBatch.upload();
 

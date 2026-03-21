@@ -12,7 +12,8 @@ class SceneEditor {
 public:
     enum class Tool : uint8_t {
         Place,
-        Select
+        Select,
+        Slice
     };
 
     SceneEditor() = default;
@@ -34,6 +35,10 @@ public:
 
     bool isDraggingFace() const { return dragFace >= 0; }
     int activeDragFace() const { return dragFace; }
+ 
+    int getSliceAxis() const { return sliceAxis; }
+    float getSlicePosition() const { return slicePosition; }
+    bool isSlicing() const { return sliceActive && selected >= 0; } 
 
 private:
     glm::vec3 raycastGrid(const InputManager& input, const Camera& camera, GLFWwindow* window) const;
@@ -57,4 +62,8 @@ private:
     AABB preview{};
 
     int dragFace = -1;
+
+    int sliceAxis = -1;
+    bool sliceActive = false;
+    float slicePosition = 0.0f;
 };
