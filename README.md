@@ -30,7 +30,7 @@ model with 405 materials and 383 textures.
 
 
 ![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
-![Alethia Screenshot](screenshots/aleitha_2.png)
+![Alethia Screenshot](screenshots/alethia_3.png)
 
 ## Requirements
 
@@ -56,6 +56,8 @@ cmake --build build -j
 - **Space** — up
 - **Shift** — down
 - **Escape** — quit
+
+![Alethia Screenshot](screenshots/aleitha_2.png)
 
 ## Architecture
 ```
