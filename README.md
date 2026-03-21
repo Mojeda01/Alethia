@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="screenshots/logo.png" alt="Alethia" width="400" />
+  <img src="screenshots/logo_2.png" alt="Alethia" width="600" />
 </p>
 
 <p align="center">
