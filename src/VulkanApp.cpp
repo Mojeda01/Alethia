@@ -2,6 +2,7 @@
 #include "Vertex.h"
 #include "GizmoMesh.h"
 #include "CubeMesh.h"
+#include "Log.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_TO_ONE
@@ -92,6 +93,8 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     lastFrameTime = now;
     std::cout << "Vulkan fully initialized\n";
 
+    Log::init(500);
+    Log::info("Alethia engine initialized");
  
     debugUI.addPanel("Performance", [this]() {
         float avg = 0.0f;
@@ -149,7 +152,10 @@ void VulkanApp::run() {
                 if (hit.y > -9999.0f) {
                     float snappedX = std::floor(hit.x) + 0.5f;
                     float snappedZ = std::floor(hit.z) + 0.5f;
+                    Log::info("Cube placed at (" + std::to_string(snappedX) + ", 0.5, " + std::to_string(snappedZ) + ")");
                     cubePositions.push_back(glm::vec3(snappedX, 0.5f, snappedZ));
+                } else {
+                    Log::warn("Raycast missed grid plane");
                 }
             }
         }
@@ -260,6 +266,10 @@ void VulkanApp::drawFrame(){
     imgui.newFrame();
     debugUI.draw();
 
+    ImGui::Begin("Log");
+    Log::drawPanel();
+    ImGui::End();
+
     UniformBuffer::MVPData mvp{};
     mvp.model = glm::mat4(1.0f);
     mvp.view = camera.viewMatrix();
@@ -272,6 +282,7 @@ void VulkanApp::drawFrame(){
     pushConstants.timeSeconds = timeSeconds;
     pushConstants.deltaSeconds = deltaSeconds;
     pushConstants.frameIndex = frameIndex++;
+    Log::setFrame(frameIndex);
 
     recordCommandBuffer(cmd, imageIndex, pushConstants);
 

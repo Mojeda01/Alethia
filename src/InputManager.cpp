@@ -28,9 +28,7 @@ InputManager::InputManager(GLFWwindow* win) : window(win)
 void InputManager::update() 
 {
 
-    void* ptr = glfwGetWindowUserPointer(window);
-    std::cout << "UserPointer: " << ptr << " this: " << this << "\n";
-    std::cout << "buttonsCurrent[0]=" << buttonsCurrent[0] << " buttonsPrevious[0]=" << buttonsPrevious[0] << "\n";
+    void* ptr = glfwGetWindowUserPointer(window); 
     std::memset(buttonsJustPressed, 0, sizeof(buttonsJustPressed)); 
     std::memcpy(keysPrevious, keysCurrent, sizeof(keysCurrent));
     std::memcpy(buttonsPrevious, buttonsCurrent, sizeof(buttonsCurrent));
@@ -115,8 +113,7 @@ void InputManager::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
 
 void InputManager::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
-    (void)mods;
-    std::cout << "CALLBACK: button=" << button << " action=" << action << "\n";
+    (void)mods; 
     auto* input = reinterpret_cast<InputManager*>(glfwGetWindowUserPointer(window));
     if (!input) return;
     if (button >= 0 && button < MAX_BUTTONS) {
@@ -124,6 +121,10 @@ void InputManager::mouseButtonCallback(GLFWwindow* window, int button, int actio
         if (action == GLFW_PRESS) {
             input->buttonsJustPressed[button] = true;
         }
+    }
+    ImGuiIO& io = ImGui::GetIO();
+    if (button >= 0 && button < ImGuiMouseButton_COUNT) {
+        io.AddMouseButtonEvent(button, action == GLFW_PRESS);
     }
 }
 

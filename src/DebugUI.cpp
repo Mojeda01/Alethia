@@ -7,9 +7,10 @@ void DebugUI::addPanel(const std::string& name, std::function<void()> drawFn) {
 }
 
 void DebugUI::draw() {
-    if (!visible) return;
-
-    ImGui::Begin("Alethia Debug");
+    if (!visible) return; 
+    
+    ImGui::SetNextWindowSizeConstraints(ImVec2(250, 200), ImVec2(600, 2000));
+    ImGui::Begin("Alethia Debug", &visible, ImGuiWindowFlags_NoCollapse);
 
     for (auto& panel : panels) {
         if (ImGui::CollapsingHeader(panel.name.c_str(), &panel.open, ImGuiTreeNodeFlags_DefaultOpen)) {
