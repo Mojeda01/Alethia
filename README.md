@@ -23,11 +23,15 @@
   <img src="https://img.shields.io/badge/license-proprietary-red" alt="license">
 </p>
 
-A custom Vulkan rendering engine built from scratch. Loads 3D models
-with textures, renders with Blinn-Phong lighting, hemisphere ambient,
-distance fog, and a first-person camera. Currently loading a full city
-model with 405 materials and 383 textures.
-
+A custom Vulkan rendering engine and level editor built from scratch
+in C++20. Features Blinn-Phong lighting with hemisphere ambient and
+specular, OBJ model loading with texture support, a procedural grid
+renderer, and a block placement system with click-drag sizing and
+per-face resizing. Includes a modular debug UI with collapsible panels,
+a runtime logging system, line rendering infrastructure, configurable
+grid snapping, and an orientation gizmo. Per-object transforms via push
+constants, independent input management, and multiple rendering
+pipelines (scene, grid, line, gizmo) running in a single render pass.
 
 ![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
 ![Alethia Screenshot](screenshots/alethia_4.png)
