@@ -469,20 +469,28 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
 
     // Draw selection lines
     {
-        lineBatch.clear();
-        int sel = editor.selectedIndex();
-        if (sel >= 0 && sel < static_cast<int>(editorCubes.size())) {
-            const AABB& box = editorCubes[sel];
-            glm::vec3 red(1.0f, 0.3f, 0.3f);
-            glm::vec3 green(0.3f, 1.0f, 0.3f);
-            glm::vec3 blue(0.3f, 0.3f, 1.0f);
-            lineBatch.addAABBEdges(box.min, box.max, red, green, blue);
+        lineBatch.clear();        
+        // draw outline for every cube in multiSelected
+        const auto& multiSel = editor.selectedSet();
+        glm::vec3 red(1.0f, 0.3f, 0.3f);
+        glm::vec3 green(0.3f, 1.0f, 0.3f);
+        glm::vec3 blue(0.3f, 0.3f, 1.0f);
+        glm::vec3 yellow(1.0f, 1.0f, 0.2f);
 
+        for (int idx : multiSel) {
+            if (idx >= 0 && idx < static_cast<int>(editorCubes.size())) {
+                 const AABB& box = editorCubes[idx];
+                 lineBatch.addAABBEdges(box.min, box.max, red, green, blue);
+            }
+        }
+
+        // slice plane visualization — only relevant for the single active selected cube
+        int sel = editor.selectedIndex();
+        if (sel >= 0 && sel < static_cast<int>(editorCubes.size())) { 
+            const AABB& box = editorCubes[sel];
             if (editor.isSlicing()) {
                 int ax = editor.getSliceAxis();
-                float sp = editor.getSlicePosition();
-                glm::vec3 yellow(1.0f, 1.0f, 0.2f);
-
+                float sp = editor.getSlicePosition(); 
                 glm::vec3 c0 = box.min;
                 glm::vec3 c1 = box.min;
                 glm::vec3 c2 = box.max;
@@ -514,6 +522,15 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
                 }
             }
         }
+        
+        // draw paste preview cubes as wireframe outlines
+        if (editor.isPasting()) {
+            for (const AABB& pv : editor.pastePreviewCubes()) {
+                glm::vec3 cyan(0.2f, 1.0f, 1.0f);
+                lineBatch.addAABBEdges(pv.min, pv.max, cyan, cyan, cyan);
+            }
+        }
+
         lineBatch.upload();
 
         if (!lineBatch.empty()) {

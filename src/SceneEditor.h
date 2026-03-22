@@ -6,6 +6,7 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include <unordered_set>
 #include <cstdint>
 
 class SceneEditor {
@@ -28,6 +29,9 @@ public:
 
     const std::vector<AABB>& getCubes() const { return cubes; }
     int selectedIndex() const { return selected; }
+    const std::unordered_set<int>& selectedSet() const { return multiSelected; }
+    bool isMultiSelected(int i) const { return multiSelected.count(i) > 0; }
+    bool hasClipboard() const { return !clipboard.empty(); }
 
     bool hasHighlight() const { return highlightValid; }
     glm::vec3 highlightMin() const { return highlightCellMin; }
@@ -43,7 +47,10 @@ public:
  
     int getSliceAxis() const { return sliceAxis; }
     float getSlicePosition() const { return slicePosition; }
-    bool isSlicing() const { return sliceActive && selected >= 0; } 
+    bool isSlicing() const { return sliceActive && selected >= 0; }
+
+    bool isPasting() const { return pasting; }
+    const std::vector<AABB>& pastePreviewCubes() const { return pastePreview; }
 
 private:
     glm::vec3 raycastGrid(const InputManager& input, const Camera& camera, GLFWwindow* window) const;
@@ -78,4 +85,17 @@ private:
 
     bool moving = false;
     glm::vec3 moveOffset{0.0f};
+
+    // multi-select and clipboard
+    std::unordered_set<int> multiSelected;
+    std::vector<AABB> clipboard;
+    glm::vec3 clipboardOrigin{0.0f};
+
+    // paste preview
+    bool pasting = false;
+    std::vector<AABB> pastePreview;
+
+    void clearSelection();
+    void buildPastePreview(float targetX, float targetY, float targetZ);
+    void eraseAndRemap(int index);
 };

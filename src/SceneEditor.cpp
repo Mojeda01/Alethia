@@ -119,6 +119,54 @@ int SceneEditor::hitTestFace(const glm::vec3& rayOrigin, const glm::vec3& rayDir
     return hitTestCube(rayOrigin, rayDir, selected, outT);
 }
 
+void SceneEditor::clearSelection() {
+    selected = -1;
+    multiSelected.clear();
+    dragFace = -1;
+};
+
+void SceneEditor::eraseAndRemap(int index) {
+    cubes.erase(cubes.begin() + index);
+
+    // rebuild multiSelected with shifted indices
+    std::unordered_set<int> remapped;
+    for (int idx : multiSelected) {
+        if (idx < index) {
+            remapped.insert(idx);
+        } else if (idx == index) {
+            // this cube was erased — drop it
+        } else {
+            remapped.insert(idx - 1);
+        }
+    }
+    multiSelected = std::move(remapped);
+
+    // fix selected
+    if (selected == index) {
+        selected = -1;
+        dragFace = -1;
+    } else if (selected > index) {
+        selected -= 1;
+    }
+}
+
+void SceneEditor::buildPastePreview(float targetX, float targetY, float targetZ) {
+    pastePreview.clear();
+    if (clipboard.empty()) return;
+
+    glm::vec3 offset(
+        snapValue(targetX) - clipboardOrigin.x,
+        targetY - clipboardOrigin.y,
+        snapValue(targetZ) - clipboardOrigin.z
+    );
+    for (const AABB& src : clipboard) {
+        AABB dst;
+        dst.min = src.min + offset;
+        dst.max = src.max + offset;
+        pastePreview.push_back(dst);
+    }
+}
+
 int SceneEditor::hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const 
 {
     float closestT = 1e30f;
@@ -199,6 +247,10 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 
             if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
                 cubes.push_back(preview);
+                int newIndex = static_cast<int>(cubes.size()) - 1;
+                multiSelected.clear();
+                multiSelected.insert(newIndex);
+                selected = newIndex;
                 Log::info("Cube placed: Y=" + std::to_string(placementY) +
                             " (" + std::to_string(preview.min.x) + ", " +
                             std::to_string(preview.min.z) + ") to (" +
@@ -266,35 +318,52 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                         return;
                     }
                 }
-
-                selected = -1;
-                dragFace = -1;
+                // find closest hit 
                 float closestT = 1e30f;
+                int hitIndex = -1;
                 for (int i = 0; i < static_cast<int>(cubes.size()); ++i) {
                     float t = 0.0f;
                     int face = hitTestCube(rayOrigin, rayDir, i, t);
                     if (face >= 0 && t < closestT) {
                         closestT = t;
-                        selected = i;
+                        hitIndex = i;
                     }
                 }
-                if (selected >= 0) {
-                    Log::info("Selected cube " + std::to_string(selected));
+                bool shiftHeld = input.isKeyPressed(GLFW_KEY_LEFT_SHIFT) ||
+                                    input.isKeyPressed(GLFW_KEY_RIGHT_SHIFT);
+
+                if (hitIndex >= 0) {
+                    if (shiftHeld) {
+                        // shift+click — toggle in multiSelected, don't change selected
+                        if (multiSelected.count(hitIndex)) {
+                            multiSelected.erase(hitIndex);
+                            Log::info("Deselected cube " + std::to_string(hitIndex));
+                        } else {
+                            multiSelected.insert(hitIndex);
+                            Log::info("Added cube " + std::to_string(hitIndex) +
+                                        " to selection (" +
+                                        std::to_string(multiSelected.size()) + " total)");
+                        }
+                    } else {
+                        multiSelected.clear();
+                        selected = hitIndex;
+                        multiSelected.insert(hitIndex);
+                        dragFace = -1;
+                        Log::info("Selected cube " + std::to_string(selected));
+                    }
+                } else {
+                    clearSelection();
                 }
             }
         }
 
         if (selected >= 0 && input.wasKeyJustPressed(GLFW_KEY_DELETE)) {
             Log::info("Deleted cube " + std::to_string(selected));
-            cubes.erase(cubes.begin() + selected);
-            selected = -1;
-            dragFace = -1;
+            eraseAndRemap(selected);
         }
         if (selected >= 0 && input.wasKeyJustPressed(GLFW_KEY_BACKSPACE)) {
             Log::info("Deleted cube " + std::to_string(selected));
-            cubes.erase(cubes.begin() + selected);
-            selected = -1;
-            dragFace = -1;
+             eraseAndRemap(selected);
         }
     }
     else if (tool == Tool::Slice) {
@@ -354,12 +423,10 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                         int oldSelected = selected;
                         cubes.push_back(cubeA);
                         cubes.push_back(cubeB);
-                        cubes.erase(cubes.begin() + oldSelected);
+                        eraseAndRemap(oldSelected);
 
                         Log::info("Cube sliced along " + std::string(1, "XYZ"[sliceAxis]) +
-                                " at " + std::to_string(slicePosition));
-
-                        selected = -1;
+                                " at " + std::to_string(slicePosition)); 
                         sliceActive = false;
                         sliceAxis = -1;
                         tool = Tool::Select;
@@ -430,6 +497,77 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             }
         }
 
+    // CMC+C - copy all selected cubes
+    bool cmdHeld = input.isKeyPressed(GLFW_KEY_LEFT_SUPER) ||
+                    input.isKeyPressed(GLFW_KEY_RIGHT_SUPER);
+
+    if (cmdHeld && input.wasKeyJustPressed(GLFW_KEY_C)) {
+        if (!multiSelected.empty()) {
+            clipboard.clear();
+
+            // compute bounding center of all selected cubes as clipboard again.
+            glm::vec3 totalMin(1e30f), totalMax(-1e30f);
+            for (int idx : multiSelected) {
+                totalMin = glm::min(totalMin, cubes[idx].min);
+                totalMax = glm::max(totalMax, cubes[idx].max);
+            }
+            clipboardOrigin = (totalMin + totalMax) * 0.5f;
+            clipboardOrigin.x = snapValue(clipboardOrigin.x);
+            clipboardOrigin.z = snapValue(clipboardOrigin.z);
+
+            for (int idx : multiSelected) {
+                clipboard.push_back(cubes[idx]);
+            }
+            Log::info("Copied " + std::to_string(clipboard.size()) + " cube(s)");
+        } else {
+            Log::warn("Nothing selected to copy");
+        }
+    }
+
+    // CMD+V — begin paste mode
+    if (cmdHeld && input.wasKeyJustPressed(GLFW_KEY_V)) {
+        if (!clipboard.empty()) {
+            pasting = true;
+            Log::info("Paste mode — click to place " +
+                        std::to_string(clipboard.size()) + " cube(s)");
+        } else {
+            Log::warn("Clipboard is empty");
+        }
+    }
+
+    // paste mode — active after CMD+V until click or Escape
+    if (pasting && !clipboard.empty()) {
+        // surface-aware raycast same as Place tool
+        glm::vec3 rayOrigin = worldRayOrigin(camera);
+        glm::vec3 rayDir    = worldRayDir(input, camera, window);
+
+        float surfaceY = 0.0f;
+        int surfHit = hitTestSurface(rayOrigin, rayDir, surfaceY);
+        float pasteY = (surfHit >= 0) ? surfaceY : 0.0f;
+
+        buildPastePreview(snappedX, pasteY, snappedZ);
+
+        if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT) && !input.imguiWantsMouse()) {
+            // commit paste — add all preview cubes to scene
+            for (const AABB& cube : pastePreview) {
+                multiSelected.insert(static_cast<int>(cubes.size()));
+                cubes.push_back(cube);
+            }
+            // set selected to first pasted cube for immediate editing
+            if (!multiSelected.empty()) {
+                selected = *multiSelected.begin();
+            }
+            Log::info("Pasted " + std::to_string(pastePreview.size()) + " cube(s)");
+            pasting = false;
+            pastePreview.clear();
+        }
+        if (input.wasKeyJustPressed(GLFW_KEY_ESCAPE)) {
+            pasting = false;
+            pastePreview.clear();
+            Log::info("Paste cancelled");
+        }
+    }
+
     if (!input.imguiWantsKeyboard() && input.wasKeyJustPressed(GLFW_KEY_1)) { 
         tool = Tool::Place;
         selected = -1;
@@ -463,13 +601,15 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 
 void SceneEditor::newProject() {
     cubes.clear();
-    selected = -1;
-    dragFace = -1;
+    clearSelection();
     sliceActive = false;
     sliceAxis = -1;
     moving = false;
     tool = Tool::Place;
     gridSnap = 1.0f;
+    clipboard.clear();
+    pastePreview.clear();
+    pasting = false;
     Log::info("New project created");
 }
 
@@ -523,11 +663,12 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
     file.close();
 
     cubes = std::move(loaded);
-    selected = -1;
-    dragFace = -1;
+    clearSelection();
     sliceActive = false;
     sliceAxis = -1;
     moving = false;
+    pasting = false;
+    pastePreview.clear();
     tool = Tool::Select;
 
     Log::info("Loaded " + std::to_string(cubes.size()) + " cubes from " + filename);
@@ -598,9 +739,25 @@ void SceneEditor::drawUI() {
     }
     if (ImGui::Button("Clear All")) {
         cubes.clear();
-        selected = -1;
+        clearSelection(); 
         Log::info("All cubes cleared");
     }
     ImGui::Separator();
-    ImGui::Text("[1] Place  [2] Select [3] Slice [4] Move  [Del] Delete \n[Shift+Drag] Move Y-axis");
+    if (!clipboard.empty()) {
+        ImGui::Text("Clipboard: %zu cube(s)", clipboard.size());
+    } 
+    if (pasting) {
+        ImGui::TextColored(ImVec4(0.2f, 1.0f, 1.0f, 1.0f), "PASTE MODE — click to place");
+        if (ImGui::Button("Cancel Paste")) {
+            pasting = false;
+            pastePreview.clear();
+        }
+    }
+    if (!multiSelected.empty()) {
+        ImGui::Text("Selected: %zu cube(s)", multiSelected.size());
+    }
+    ImGui::Separator();
+    ImGui::Text("[1] Place  [2] Select [3] Slice [4] Move  [Del] Delete\n"
+                "[Shift+Click] Multi-select  [CMD+C] Copy  [CMD+V] Paste\n"
+                "[Shift+Drag] Move Y-axis");
 }
