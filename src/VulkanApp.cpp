@@ -132,6 +132,10 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 
     debugUI.addPanel("Render", [this]() {
             ImGui::Checkbox("Wireframe", &wireframe);
+            ImGui::Separator();
+            if (ImGui::Button("Quit")) {
+                glfwSetWindowShouldClose(window.get(), GLFW_TRUE);
+            }
     });
     
     uniformBuffer.bindTexture(devTexture.view(), devTexture.sampler());
@@ -139,12 +143,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 
 void VulkanApp::run() {
     while (!window.shouldClose()) {
-        window.pollEvents();
-
-        if (input.isKeyPressed(GLFW_KEY_ESCAPE)){ 
-            glfwSetWindowShouldClose(window.get(), GLFW_TRUE);
-            continue;
-        }
+        window.pollEvents();   
 
         editor.update(input, camera, window.get());
 
