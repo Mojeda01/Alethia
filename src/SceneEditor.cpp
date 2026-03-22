@@ -342,15 +342,33 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                 if (moving && input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
                     AABB& sel = cubes[selected];
                     glm::vec3 sz = sel.size();
-                    float newCenterX = snappedX + moveOffset.x;
-                    float newCenterZ = snappedZ + moveOffset.z;
-                    newCenterX = snapValue(newCenterX);
-                    newCenterZ = snapValue(newCenterZ);
+                    if (input.isKeyPressed(GLFW_KEY_LEFT_SHIFT) || input.isKeyPressed(GLFW_KEY_RIGHT_SHIFT)) {
+                        glm::vec3 rayOrigin = worldRayOrigin(camera);
+                        glm::vec3 rayDir = worldRayDir(input, camera, window);
 
-                    sel.min.x = newCenterX - sz.x * 0.5f;
-                    sel.max.x = newCenterX + sz.x * 0.5f;
-                    sel.min.z = newCenterZ - sz.z * 0.5f;
-                    sel.max.z = newCenterZ + sz.z * 0.5f;
+                        glm::vec3 camFlat = glm::normalize(glm::vec3(rayDir.x, 0.0f, rayDir.z));
+                        glm::vec3 cubeCenter = sel.center();
+                        float denom = glm::dot(camFlat, rayDir);
+                        if (std::abs(denom) > 0.001f) {
+                            float t = glm::dot(cubeCenter - rayOrigin, camFlat) / denom;
+                            if (t > 0.0f) {
+                                glm::vec3 worldPoint = rayOrigin + rayDir * t;
+                                float newY = snapValue(worldPoint.y - sz.y * 0.5f);
+                                if (newY < 0.0f) newY = 0.0f;
+                                sel.min.y = newY;
+                                sel.max.y = newY + sz.y;
+                            }
+                        }
+                    } else {
+                        float newCenterX = snappedX + moveOffset.x;
+                        float newCenterZ = snappedZ + moveOffset.z;
+                        newCenterX = snapValue(newCenterX);
+                        newCenterZ = snapValue(newCenterZ);
+                        sel.min.x = newCenterX - sz.x * 0.5f;
+                        sel.max.x = newCenterX + sz.x * 0.5f;
+                        sel.min.z = newCenterZ - sz.z * 0.5f;
+                        sel.max.z = newCenterZ + sz.z * 0.5f;
+                    }
                 }
 
                 if (moving && !input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
@@ -465,5 +483,5 @@ void SceneEditor::drawUI() {
         Log::info("All cubes cleared");
     }
     ImGui::Separator();
-    ImGui::Text("[1] Place  [2] Select [3] Slice [4] Move  [Del] Delete");
+    ImGui::Text("[1] Place  [2] Select [3] Slice [4] Move  [Del] Delete \n[Shift+Drag] Move Y-axis");
 }

@@ -131,13 +131,15 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     });
 
     debugUI.addPanel("Render", [this]() {
-            ImGui::Checkbox("Wireframe", &wireframe);
-            ImGui::Separator();
-            if (ImGui::Button("Quit")) {
-                glfwSetWindowShouldClose(window.get(), GLFW_TRUE);
-            }
+            ImGui::Checkbox("Wireframe", &wireframe);        
     });
     
+    debugUI.addPanel("General", [this]() {
+        if (ImGui::Button("Quit")) {
+            glfwSetWindowShouldClose(window.get(), GLFW_TRUE); 
+        } 
+    });
+
     uniformBuffer.bindTexture(devTexture.view(), devTexture.sampler());
 }
 
