@@ -70,7 +70,8 @@ private:
     Camera camera;
     ImGuiLayer imgui;
     DebugUI debugUI; 
-    float lightPos[3] = { 5.0f, 10.0f, 5.0f }; 
+    float lightPos[3] = { 5.0f, 10.0f, 5.0f };
+    char sceneFilename[256] = "scene.alethia";
     bool wireframe = false;
     static constexpr int FRAME_TIME_COUNT = 120;
     float frameTimes[FRAME_TIME_COUNT] = {};

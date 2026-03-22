@@ -99,9 +99,29 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     lastFrameTime = now;
     std::cout << "Vulkan fully initialized\n";
 
+    input.installCallbacks();
+
     Log::init(500);
     Log::info("Alethia engine initialized");
- 
+
+    debugUI.addPanel("General", [this]() {
+        ImGui::InputText("File", sceneFilename, sizeof(sceneFilename));
+        if (ImGui::Button("New")) {
+            editor.newProject();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) {
+            editor.saveToFile(std::string(sceneFilename));
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Load")) {
+            editor.loadFromFile(std::string(sceneFilename));
+        }
+        if (ImGui::Button("Quit")) {
+            glfwSetWindowShouldClose(window.get(), GLFW_TRUE); 
+        } 
+    });
+
     debugUI.addPanel("Performance", [this]() {
         float avg = 0.0f;
         for (int i = 0; i < FRAME_TIME_COUNT; ++i) avg += frameTimes[i];
@@ -132,12 +152,6 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 
     debugUI.addPanel("Render", [this]() {
             ImGui::Checkbox("Wireframe", &wireframe);        
-    });
-    
-    debugUI.addPanel("General", [this]() {
-        if (ImGui::Button("Quit")) {
-            glfwSetWindowShouldClose(window.get(), GLFW_TRUE); 
-        } 
     });
 
     uniformBuffer.bindTexture(devTexture.view(), devTexture.sampler());

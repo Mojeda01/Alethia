@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 #include <algorithm>
+#include <fstream>
 
 float SceneEditor::snapValue(float val) const {
     return std::round(val / gridSnap) * gridSnap;
@@ -384,17 +385,17 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             }
         }
 
-    if (input.wasKeyJustPressed(GLFW_KEY_1)) {
+    if (!input.imguiWantsKeyboard() && input.wasKeyJustPressed(GLFW_KEY_1)) { 
         tool = Tool::Place;
         selected = -1;
         Log::info("Tool: Place");
     }
-    if (input.wasKeyJustPressed(GLFW_KEY_2)) {
+    if (!input.imguiWantsKeyboard() && input.wasKeyJustPressed(GLFW_KEY_2)) { 
         tool = Tool::Select;
         dragging = false;
         Log::info("Tool: Select");
     }
-    if (input.wasKeyJustPressed(GLFW_KEY_3)) {
+    if (!input.imguiWantsKeyboard() && input.wasKeyJustPressed(GLFW_KEY_3)) { 
         if (selected >= 0) {
             tool = Tool::Slice;
             sliceActive = false;
@@ -404,7 +405,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             Log::warn("Select a cube first before slicing");
         }
     }
-    if (input.wasKeyJustPressed(GLFW_KEY_4)) {
+    if (!input.imguiWantsKeyboard() && input.wasKeyJustPressed(GLFW_KEY_4)) { 
         if (selected >= 0) {
             tool = Tool::Move;
             moving = false;
@@ -413,6 +414,79 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             Log::warn("Select a cube first before moving");
         }
     }
+}
+
+void SceneEditor::newProject() {
+    cubes.clear();
+    selected = -1;
+    dragFace = -1;
+    sliceActive = false;
+    sliceAxis = -1;
+    moving = false;
+    tool = Tool::Place;
+    gridSnap = 1.0f;
+    Log::info("New project created");
+}
+
+bool SceneEditor::saveToFile(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        Log::error("Failed to open file for saving: " + filename);
+        return false;
+    }
+
+    file << "alethia v1 snap=" << gridSnap << "\n";
+    for (const auto& cube : cubes) {
+        file << cube.min.x << " " << cube.min.y << " " << cube.min.z << " "
+             << cube.max.x << " " << cube.max.y << " " << cube.max.z << "\n";
+    }
+
+    file.close();
+    Log::info("Saved " + std::to_string(cubes.size()) + " cubes to " + filename);
+    return true;
+}
+
+bool SceneEditor::loadFromFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        Log::error("Failed to open file for loading: " + filename);
+        return false;
+    }
+
+    std::string header;
+    std::getline(file, header);
+
+    if (header.find("alethia v1") == std::string::npos) {
+        Log::error("Invalid file format: " + filename);
+        return false;
+    }
+
+    auto snapPos = header.find("snap=");
+    if (snapPos != std::string::npos) {
+        gridSnap = std::stof(header.substr(snapPos + 5));
+    }
+
+    std::vector<AABB> loaded;
+    float minX, minY, minZ, maxX, maxY, maxZ;
+    while (file >> minX >> minY >> minZ >> maxX >> maxY >> maxZ) {
+        AABB cube;
+        cube.min = glm::vec3(minX, minY, minZ);
+        cube.max = glm::vec3(maxX, maxY, maxZ);
+        loaded.push_back(cube);
+    }
+
+    file.close();
+
+    cubes = std::move(loaded);
+    selected = -1;
+    dragFace = -1;
+    sliceActive = false;
+    sliceAxis = -1;
+    moving = false;
+    tool = Tool::Select;
+
+    Log::info("Loaded " + std::to_string(cubes.size()) + " cubes from " + filename);
+    return true;
 }
 
 void SceneEditor::drawUI() {

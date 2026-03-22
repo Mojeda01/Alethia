@@ -1,15 +1,13 @@
 #include "InputManager.h"
 #include <imgui.h>
+#include <imgui_impl_glfw.h>
 #include <cstring>
 #include <iostream>
 
 InputManager::InputManager(GLFWwindow* win) : window(win)
 {
     glfwSetWindowUserPointer(window, this);
-    glfwSetCursorPosCallback(window, InputManager::cursorPosCallback);
-    glfwSetMouseButtonCallback(window, InputManager::mouseButtonCallback);
-    glfwSetFramebufferSizeCallback(window, InputManager::framebufferResizeCallback);
-
+   
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     if (!glfwRawMouseMotionSupported()) {
         glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
@@ -136,4 +134,55 @@ void InputManager::framebufferResizeCallback(GLFWwindow* window, int width, int 
     if (input) {
         input->fbResized = true;
     }
+}
+
+void InputManager::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    (void)scancode;
+    auto* input = reinterpret_cast<InputManager*>(glfwGetWindowUserPointer(window));
+    if (!input) return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddKeyEvent(ImGuiMod_Ctrl, (mods & GLFW_MOD_CONTROL) != 0);
+    io.AddKeyEvent(ImGuiMod_Shift, (mods & GLFW_MOD_SHIFT) != 0);
+    io.AddKeyEvent(ImGuiMod_Alt, (mods & GLFW_MOD_ALT) != 0);
+    io.AddKeyEvent(ImGuiMod_Super, (mods & GLFW_MOD_SUPER) != 0);
+
+    ImGuiKey imKey = ImGuiKey_None;
+    if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z) imKey = (ImGuiKey)(ImGuiKey_A + (key - GLFW_KEY_A));
+    else if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) imKey = (ImGuiKey)(ImGuiKey_0 + (key - GLFW_KEY_0));
+    else if (key == GLFW_KEY_SPACE) imKey = ImGuiKey_Space;
+    else if (key == GLFW_KEY_ENTER) imKey = ImGuiKey_Enter;
+    else if (key == GLFW_KEY_BACKSPACE) imKey = ImGuiKey_Backspace;
+    else if (key == GLFW_KEY_DELETE) imKey = ImGuiKey_Delete;
+    else if (key == GLFW_KEY_LEFT) imKey = ImGuiKey_LeftArrow;
+    else if (key == GLFW_KEY_RIGHT) imKey = ImGuiKey_RightArrow;
+    else if (key == GLFW_KEY_UP) imKey = ImGuiKey_UpArrow;
+    else if (key == GLFW_KEY_DOWN) imKey = ImGuiKey_DownArrow;
+    else if (key == GLFW_KEY_HOME) imKey = ImGuiKey_Home;
+    else if (key == GLFW_KEY_END) imKey = ImGuiKey_End;
+    else if (key == GLFW_KEY_ESCAPE) imKey = ImGuiKey_Escape;
+    else if (key == GLFW_KEY_TAB) imKey = ImGuiKey_Tab;
+    else if (key == GLFW_KEY_PERIOD) imKey = ImGuiKey_Period;
+    else if (key == GLFW_KEY_MINUS) imKey = ImGuiKey_Minus;
+
+    if (imKey != ImGuiKey_None) {
+        io.AddKeyEvent(imKey, action != GLFW_RELEASE);
+    }
+}
+
+void InputManager::charCallback(GLFWwindow* window, unsigned int codepoint) {
+    auto* input = reinterpret_cast<InputManager*>(glfwGetWindowUserPointer(window));
+    if (!input) return;
+    std::cout << "CHAR: " << codepoint << "\n";
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddInputCharacter(codepoint);
+}
+
+void InputManager::installCallbacks() {
+    glfwSetCursorPosCallback(window, InputManager::cursorPosCallback);
+    glfwSetMouseButtonCallback(window, InputManager::mouseButtonCallback);
+    glfwSetKeyCallback(window, InputManager::keyCallback);
+    glfwSetCharCallback(window, InputManager::charCallback);
+    glfwSetFramebufferSizeCallback(window, InputManager::framebufferResizeCallback);
 }

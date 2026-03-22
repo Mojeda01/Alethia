@@ -6,6 +6,7 @@
 class InputManager{
 public:
     InputManager(GLFWwindow* window);
+    void installCallbacks();
 
     InputManager(const InputManager&) = delete;
     InputManager& operator=(const InputManager) = delete;
@@ -29,6 +30,8 @@ public:
 private:
     static void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
     static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void charCallback(GLFWwindow* window, unsigned int codepoint);
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 
     GLFWwindow* window = nullptr;

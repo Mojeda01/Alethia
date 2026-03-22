@@ -21,6 +21,10 @@ public:
 
     void update(const InputManager& input, const Camera& camera, GLFWwindow* window);
     void drawUI();
+    
+    void newProject();
+    bool saveToFile(const std::string& filename) const;
+    bool loadFromFile(const std::string& filename);
 
     const std::vector<AABB>& getCubes() const { return cubes; }
     int selectedIndex() const { return selected; }
