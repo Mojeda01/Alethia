@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_set>
 #include <cstdint>
+#include <deque>
 
 class SceneEditor {
 public:
@@ -18,7 +19,7 @@ public:
         Move
     };
 
-    SceneEditor() = default;
+    SceneEditor() { newProject(); } 
 
     void update(const InputManager& input, const Camera& camera, GLFWwindow* window);
     void drawUI();
@@ -52,12 +53,26 @@ public:
     bool isPasting() const { return pasting; }
     const std::vector<AABB>& pastePreviewCubes() const { return pastePreview; }
 
+    void undo();
+    void redo();
+    bool canUndo() const { return historyCursor > 0; }
+    bool canRedo() const { return historyCursor < static_cast<int>(history.size()) - 1; }
+
 private:
+    void pushSnapshot();
+    void clearSelection();
+    void buildPastePreview(float targetX, float targetY, float targetZ);
+    void eraseAndRemap(int index);
+    int hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const; 
+
+    std::deque<std::vector<AABB>> history;
+    int historyCursor = -1;
+    static constexpr int MAX_HISTORY = 64;
+
     glm::vec3 raycastGrid(const InputManager& input, const Camera& camera, GLFWwindow* window) const;
     glm::vec3 worldRayDir(const InputManager& input, const Camera& camera, GLFWwindow* window) const;
     glm::vec3 worldRayOrigin(const Camera& camera) const;
     int hitTestCube(const glm::vec3& rayOrigin, const glm::vec3& rayDir, int cubeIndex, float& outT) const;
-    int hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const;
     int hitTestFace(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outT) const;
     float snapValue(float val) const;
 
@@ -93,9 +108,6 @@ private:
 
     // paste preview
     bool pasting = false;
-    std::vector<AABB> pastePreview;
-
-    void clearSelection();
-    void buildPastePreview(float targetX, float targetY, float targetZ);
-    void eraseAndRemap(int index);
+    std::vector<AABB> pastePreview;  
+    
 };
