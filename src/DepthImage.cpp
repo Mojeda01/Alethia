@@ -49,8 +49,7 @@ DepthImage::DepthImage( VkDevice dev,
         throw std::invalid_argument("DepthImage: extent must be non-zero");
     }
     
-    depthFormat = findSupportedFormat(physicalDevice);
-    std::cout << "Depth format: " << depthFormat << "\n";
+    depthFormat = findSupportedFormat(physicalDevice); 
 
     VkImageCreateInfo ici{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     ici.imageType = VK_IMAGE_TYPE_2D;

@@ -119,6 +119,25 @@ int SceneEditor::hitTestFace(const glm::vec3& rayOrigin, const glm::vec3& rayDir
     return hitTestCube(rayOrigin, rayDir, selected, outT);
 }
 
+int SceneEditor::hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const 
+{
+    float closestT = 1e30f;
+    int hitIndex = -1;
+
+    for (int i = 0; i < static_cast<int>(cubes.size()); ++i){
+        float t = 0.0f;
+        int face = hitTestCube(rayOrigin, rayDir, i, t);
+        if (face == 2 && t < closestT) {
+            closestT = t;
+            hitIndex = i;
+        }
+    }
+    if (hitIndex >= 0) {
+        outY = cubes[hitIndex].max.y;
+    }
+    return hitIndex;
+}
+
 void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwindow* window) {
     highlightValid = false;
 
@@ -132,39 +151,65 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
     float snappedZ = snapValue(hit.z);
 
     if (tool == Tool::Place) {
-        highlightValid = true;
-        highlightCellMin = glm::vec3(snappedX - gridSnap * 0.5f, 0.0f, snappedZ - gridSnap * 0.5f);
-        highlightCellMax = glm::vec3(snappedX + gridSnap * 0.5f, 0.01f, snappedZ + gridSnap * 0.5f);
+        // fire ray against existing cube top faces first
+        glm::vec3 rayOrigin = worldRayOrigin(camera);
+        glm::vec3 rayDir = worldRayDir(input, camera, window);
 
-        if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
-            dragging = true;
-            dragStart = glm::vec3(snappedX, 0.0f, snappedZ);
+        float surfaceY = 0.0f;
+        surfaceHitCube = hitTestSurface(rayOrigin, rayDir, surfaceY);
+
+        if (!dragging){
+            // hovering - show context-aware highlighting
+            highlightValid = true;
+
+            if (surfaceHitCube >= 0) {
+                // hovering over a cube top face — highlight the entire top face
+                const AABB& below = cubes[surfaceHitCube];
+                highlightCellMin = glm::vec3(below.min.x, below.max.y, below.min.z);
+                highlightCellMax = glm::vec3(below.max.x, below.max.y + 0.02f, below.max.z);
+            } else {
+                // hovering over ground — highlight single grid cell
+                highlightCellMin = glm::vec3(snappedX - gridSnap * 0.5f, 0.0f,  snappedZ - gridSnap * 0.5f);
+                highlightCellMax = glm::vec3(snappedX + gridSnap * 0.5f, 0.02f, snappedZ + gridSnap * 0.5f);
+            }
+            if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                placementY = (surfaceHitCube >= 0) ? surfaceY : 0.0f;
+                dragging   = true;
+                dragStart  = glm::vec3(snappedX, placementY, snappedZ);
+                Log::info("Drag started at Y=" + std::to_string(placementY));
+            }
         }
 
         if (dragging) {
+            // suppress hover highlight during drag — reduces visual noise
+            highlightValid = false;
+
             float minX = std::min(dragStart.x, snappedX);
             float maxX = std::max(dragStart.x, snappedX);
             float minZ = std::min(dragStart.z, snappedZ);
             float maxZ = std::max(dragStart.z, snappedZ);
-
-            if (maxX - minX < gridSnap) maxX = minX + gridSnap;
-            if (maxZ - minZ < gridSnap) maxZ = minZ + gridSnap;
-
-            preview.min = glm::vec3(minX, 0.0f, minZ); 
-            preview.max = glm::vec3(maxX + gridSnap, gridSnap, maxZ + gridSnap); 
-
-            highlightCellMin = glm::vec3(snappedX, 0.0f, snappedZ); 
-            highlightCellMax = glm::vec3(snappedX + gridSnap, 0.01f, snappedZ + gridSnap); 
+            
+            // respond after half a grid cell instead of a full cell.
+            if (maxX - minX < gridSnap * 0.5f) maxX = minX + gridSnap;  
+            if (maxZ - minZ < gridSnap * 0.5f) maxZ = minZ + gridSnap;
+            
+            // preview is exactly what you see — no extra gridSnap added
+            preview.min = glm::vec3(minX, placementY, minZ);
+            preview.max = glm::vec3(maxX, placementY + gridSnap, maxZ);  
 
             if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
                 cubes.push_back(preview);
-                Log::info("Cube placed: (" +
-                    std::to_string(preview.min.x) + ", " + std::to_string(preview.min.z) + ") to (" +
-                    std::to_string(preview.max.x) + ", " + std::to_string(preview.max.z) + ")");
+                Log::info("Cube placed: Y=" + std::to_string(placementY) +
+                            " (" + std::to_string(preview.min.x) + ", " +
+                            std::to_string(preview.min.z) + ") to (" +
+                            std::to_string(preview.max.x) + ", " +
+                            std::to_string(preview.max.z) + ")");
                 dragging = false;
+                surfaceHitCube = -1;
             }
         }
-    } else if (tool == Tool::Select) {
+    } 
+    else if (tool == Tool::Select) {
         glm::vec3 rayOrigin = worldRayOrigin(camera);
         glm::vec3 rayDir = worldRayDir(input, camera, window);
 

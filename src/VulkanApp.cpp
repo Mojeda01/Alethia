@@ -96,9 +96,8 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 {
     auto now = std::chrono::steady_clock::now();
     startTime = now;
-    lastFrameTime = now;
-    std::cout << "Vulkan fully initialized\n";
-
+    lastFrameTime = now;  
+    
     input.installCallbacks();
 
     Log::init(500);
@@ -160,9 +159,8 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 void VulkanApp::run() {
     while (!window.shouldClose()) {
         window.pollEvents();   
-
+        
         editor.update(input, camera, window.get());
-
         input.update();
         drawFrame();
     }

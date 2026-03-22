@@ -50,6 +50,7 @@ private:
     glm::vec3 worldRayDir(const InputManager& input, const Camera& camera, GLFWwindow* window) const;
     glm::vec3 worldRayOrigin(const Camera& camera) const;
     int hitTestCube(const glm::vec3& rayOrigin, const glm::vec3& rayDir, int cubeIndex, float& outT) const;
+    int hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const;
     int hitTestFace(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outT) const;
     float snapValue(float val) const;
 
@@ -65,6 +66,9 @@ private:
     bool dragging = false;
     glm::vec3 dragStart{0.0f};
     AABB preview{};
+
+    float placementY = 0.0f;
+    int surfaceHitCube = -1;
 
     int dragFace = -1;
 

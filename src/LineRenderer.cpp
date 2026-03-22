@@ -142,10 +142,13 @@ LineRenderer::LineRenderer(VkDevice dev, VkRenderPass rp, VkDescriptorSetLayout 
             throw std::runtime_error("LineRenderer: vkCreateGraphicsPipelines failed");
         }
 
-        vertModule = tmpVert;
-        fragModule = tmpFrag;
         pipelineLayout = tmpLayout;
         pipeline = tmpPipeline;
+        vkDestroyShaderModule(device, tmpVert, nullptr);
+        vkDestroyShaderModule(device, tmpFrag, nullptr);
+        tmpVert = VK_NULL_HANDLE;
+        tmpFrag = VK_NULL_HANDLE;
+
     } catch (...) {
         if (tmpPipeline) vkDestroyPipeline(device, tmpPipeline, nullptr);
         if (tmpLayout) vkDestroyPipelineLayout(device, tmpLayout, nullptr);
@@ -158,28 +161,23 @@ LineRenderer::LineRenderer(VkDevice dev, VkRenderPass rp, VkDescriptorSetLayout 
 void LineRenderer::destroy() noexcept {
     if (device != VK_NULL_HANDLE) {
         if (pipeline) vkDestroyPipeline(device, pipeline, nullptr);
-        if (pipelineLayout) vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        if (vertModule) vkDestroyShaderModule(device, vertModule, nullptr);
-        if (fragModule) vkDestroyShaderModule(device, fragModule, nullptr);
+        if (pipelineLayout) vkDestroyPipelineLayout(device, pipelineLayout, nullptr); 
     }
     pipeline = VK_NULL_HANDLE;
-    pipelineLayout = VK_NULL_HANDLE;
-    vertModule = VK_NULL_HANDLE;
-    fragModule = VK_NULL_HANDLE;
+    pipelineLayout = VK_NULL_HANDLE; 
     renderPass = VK_NULL_HANDLE;
     device = VK_NULL_HANDLE;
 }
 
 LineRenderer::LineRenderer(LineRenderer&& o) noexcept
-    : device(o.device), renderPass(o.renderPass), pipelineLayout(o.pipelineLayout),
-      pipeline(o.pipeline), vertModule(o.vertModule), fragModule(o.fragModule)
+    :   device(o.device), renderPass(o.renderPass), 
+        pipelineLayout(o.pipelineLayout),
+        pipeline(o.pipeline)
 {
     o.device = VK_NULL_HANDLE;
     o.renderPass = VK_NULL_HANDLE;
     o.pipelineLayout = VK_NULL_HANDLE;
-    o.pipeline = VK_NULL_HANDLE;
-    o.vertModule = VK_NULL_HANDLE;
-    o.fragModule = VK_NULL_HANDLE;
+    o.pipeline = VK_NULL_HANDLE; 
 }
 
 LineRenderer& LineRenderer::operator=(LineRenderer&& o) noexcept {
@@ -189,14 +187,10 @@ LineRenderer& LineRenderer::operator=(LineRenderer&& o) noexcept {
     renderPass = o.renderPass;
     pipelineLayout = o.pipelineLayout;
     pipeline = o.pipeline;
-    vertModule = o.vertModule;
-    fragModule = o.fragModule;
     o.device = VK_NULL_HANDLE;
     o.renderPass = VK_NULL_HANDLE;
     o.pipelineLayout = VK_NULL_HANDLE;
-    o.pipeline = VK_NULL_HANDLE;
-    o.vertModule = VK_NULL_HANDLE;
-    o.fragModule = VK_NULL_HANDLE;
+    o.pipeline = VK_NULL_HANDLE; 
     return *this;
 }
 

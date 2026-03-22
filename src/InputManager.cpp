@@ -7,9 +7,10 @@
 InputManager::InputManager(GLFWwindow* win) : window(win)
 {
     glfwSetWindowUserPointer(window, this);
+    installCallbacks();
    
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    if (!glfwRawMouseMotionSupported()) {
+    if (glfwRawMouseMotionSupported()) {
         glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     }
 
@@ -172,8 +173,7 @@ void InputManager::keyCallback(GLFWwindow* window, int key, int scancode, int ac
 
 void InputManager::charCallback(GLFWwindow* window, unsigned int codepoint) {
     auto* input = reinterpret_cast<InputManager*>(glfwGetWindowUserPointer(window));
-    if (!input) return;
-    std::cout << "CHAR: " << codepoint << "\n";
+    if (!input) return; 
 
     ImGuiIO& io = ImGui::GetIO();
     io.AddInputCharacter(codepoint);
