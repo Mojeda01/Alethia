@@ -9,7 +9,7 @@
 #include <fstream>
 
 float SceneEditor::snapValue(float val) const {
-    return std::round(val / gridSnap) * gridSnap;
+    return std::floor(val / gridSnap) * gridSnap;
 }
 
 glm::vec3 SceneEditor::worldRayOrigin(const Camera& camera) const {
@@ -150,11 +150,11 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             if (maxX - minX < gridSnap) maxX = minX + gridSnap;
             if (maxZ - minZ < gridSnap) maxZ = minZ + gridSnap;
 
-            preview.min = glm::vec3(minX - gridSnap * 0.5f, 0.0f, minZ - gridSnap * 0.5f);
-            preview.max = glm::vec3(maxX + gridSnap * 0.5f, gridSnap, maxZ + gridSnap * 0.5f);
+            preview.min = glm::vec3(minX, 0.0f, minZ); 
+            preview.max = glm::vec3(maxX + gridSnap, gridSnap, maxZ + gridSnap); 
 
-            highlightCellMin = preview.min;
-            highlightCellMax = glm::vec3(preview.max.x, 0.01f, preview.max.z);
+            highlightCellMin = glm::vec3(snappedX, 0.0f, snappedZ); 
+            highlightCellMax = glm::vec3(snappedX + gridSnap, 0.01f, snappedZ + gridSnap); 
 
             if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
                 cubes.push_back(preview);

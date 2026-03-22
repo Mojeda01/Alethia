@@ -34,7 +34,7 @@ constants, independent input management, and multiple rendering
 pipelines (scene, grid, line, gizmo) running in a single render pass.
 
 ![Alethia Screenshot](screenshots/alethia_18_03_2026.png)
-![Alethia Screenshot](screenshots/alethia_4.png)
+![Alethia Screenshot](screenshots/alethia_5.png)
 
 ## Requirements
 
@@ -97,3 +97,6 @@ shaders/
 └── triangle.frag         Texture sampling, Blinn-Phong, hemisphere ambient,
                           rim light, distance fog, gamma correction
 ```
+
+![Alethia Screenshot](screenshots/alethia_4.png)
+
