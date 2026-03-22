@@ -19,6 +19,9 @@
   <img src="https://img.shields.io/badge/UI-Dear%20ImGui-blue" alt="ImGui">
   <img src="https://img.shields.io/badge/math-GLM-purple" alt="GLM">
   <img src="https://img.shields.io/badge/windowing-GLFW3-green" alt="GLFW">
+  <img src="https://img.shields.io/badge/physics-AABB-blue" alt="physics">
+  <img src="https://img.shields.io/badge/editor-level%20editor-brightgreen" alt="editor">
+  <img src="https://img.shields.io/badge/undo%2Fredo-64%20steps-informational" alt="undo">
   <br>
   <img src="https://img.shields.io/badge/license-proprietary-red" alt="license">
 </p>
@@ -36,7 +39,9 @@ A custom Vulkan rendering engine and level editor built from scratch in C++20. F
 - GLFW3
 - GLM
 
-Note: macOS typically uses MoltenVK; this project enables Vulkan portability extensions.
+> **macOS:** MoltenVK is required. This project enables Vulkan portability
+extensions automatically. GLM is expected at `/opt/homebrew/include/glm/`
+(install via `brew install glm`).
 
 ## Build & run
 ```sh
@@ -47,48 +52,34 @@ cmake --build build -j
 
 ## Controls
 
-- **WASD** — move
+### Editor Mode
+- **WASD** — fly camera
 - **Mouse** — look
-- **Space** — up
-- **Shift** — down
+- **Space** — fly up
+- **Shift** — fly down
+- **Tab** — toggle editor UI / cursor
 - **Escape** — quit
 
+### Editor Tools (UI mode)
+- **1** — Place tool
+- **2** — Select tool
+- **3** — Slice tool
+- **4** — Move tool
+- **Del / Backspace** — delete selected cube
+- **Shift+Click** — multi-select
+- **CMD+C** — copy selection
+- **CMD+V** — paste
+- **CMD+Z** — undo
+- **CMD+Shift+Z** — redo
+- **Shift+Drag** — move cube on Y axis
+
+### Play Mode (P to enter, P to return to editor)
+- **WASD** — walk
+- **Shift** — sprint
+- **Space** — jump
+- **Mouse** — look
+- **F** — toggle noclip / free flight
+- **P** — return to editor
+
 ![Alethia Screenshot](screenshots/aleitha_2.png)
-
-## Architecture
-```
-src/
-├── main.cpp              Entry point
-├── VulkanApp.h/cpp       Application loop, input, frame submission
-├── Window.h/cpp          GLFW window wrapper
-├── Instance.h/cpp        Vulkan instance
-├── Surface.h/cpp         Window surface
-├── Device.h/cpp          Physical/logical device and queues
-├── Swapchain.h/cpp       Swapchain images and views
-├── SwapchainBundle.h/cpp Swapchain + depth image + render pass + framebuffers
-├── DepthImage.h/cpp      Depth buffer image and view
-├── RenderPass.h/cpp      Color + depth render pass
-├── Framebuffer.h/cpp     Per-image framebuffers
-├── CommandPool.h/cpp     Command pool and buffer allocation
-├── FrameSync.h/cpp       Semaphores and fences for frame pacing
-├── Buffer.h/cpp          General-purpose Vulkan buffer (RAII)
-├── MeshBuffer.h/cpp      Staged vertex/index upload to device-local memory
-├── Vertex.h              Vertex layout (position, color, normal, texcoord)
-├── ObjLoader.h/cpp       OBJ/MTL parser with triangulation and deduplication
-├── TextureImage.h/cpp    VkImage + sampler from PNG/JPG via stb_image
-├── UniformBuffer.h/cpp   Per-frame UBO with MVP + lighting descriptor sets
-├── Camera.h/cpp          First-person camera with mouse look
-├── external/
-│   ├── tiny_obj_loader.h OBJ/MTL parsing (tinyobjloader)
-│   └── stb_image.h       Image decoding (stb)
-└── triangle/
-    └── TriangleRenderer  Shader pipeline, push constants, draw recording
-
-shaders/
-├── triangle.vert         MVP transform, normals, texcoords, fog distance
-└── triangle.frag         Texture sampling, Blinn-Phong, hemisphere ambient,
-                          rim light, distance fog, gamma correction
-```
-
 ![Alethia Screenshot](screenshots/alethia_4.png)
-
