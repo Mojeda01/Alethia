@@ -27,6 +27,9 @@
 #include "DevTexture.h"
 #include "AABB.h"
 #include "SceneEditor.h"
+#include "AppMode.h"
+#include "PlayerController.h"
+#include "PhysicsSolver.h"
 
 #include <chrono>
 #include <cstdint>
@@ -36,6 +39,11 @@
 #include <glm/glm.hpp>
 
 class VulkanApp{
+private:
+    AppMode appMode = AppMode::Edit;
+    PlayerController player;
+    PhysicsSolver physicsSolver;
+    Camera playerCamera;
 public:
     VulkanApp(int width, int height, const char* title);
     VulkanApp(const VulkanApp&) = delete;
@@ -44,7 +52,9 @@ public:
 private:
     void cleanup();
     void drawFrame();
-    void recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants);
+    void recordCommandBuffer(   VkCommandBuffer cmd, uint32_t imageIndex,
+                                const TriangleRenderer::PushConstants& pushConstants,
+                                const Camera& activeCamera);
     void recreateSwapchain(); 
     glm::vec3 raycastGrid(double mouseX, double mouseY) const;
 private:

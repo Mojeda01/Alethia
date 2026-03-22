@@ -75,3 +75,13 @@ void Camera::updateVectors() {
     right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
     up = glm::normalize(glm::cross(right, front));
 }
+
+void Camera::setPosition(const glm::vec3& p) {
+    pos = p;
+}
+
+void Camera::setOrientation(float yawDegrees, float pitchDegrees) {
+    yawAngle   = yawDegrees;
+    pitchAngle = std::clamp(pitchDegrees, -89.0f, 89.0f);
+    updateVectors();
+}

@@ -12,6 +12,8 @@ public:
     void processKeyboard(GLFWwindow* window, float deltaSeconds);
     void processMouse(double xOffset, double yOffset);
     void setAspectRatio(float aspectRatio);
+    void setPosition(const glm::vec3& position); 
+    void setOrientation(float yawDegrees, float pitchDegrees);
 
     glm::mat4 viewMatrix() const;
     glm::mat4 projectionMatrix() const;

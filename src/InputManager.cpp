@@ -141,6 +141,12 @@ void InputManager::keyCallback(GLFWwindow* window, int key, int scancode, int ac
     (void)scancode;
     auto* input = reinterpret_cast<InputManager*>(glfwGetWindowUserPointer(window));
     if (!input) return;
+    
+    // in FPS mode, block Space and Enter from reaching ImGui
+    // prevents gameplay keys from activating focused UI buttons
+    if (!input->uiMode && (key == GLFW_KEY_SPACE || key == GLFW_KEY_ENTER)) {
+        return;
+    }
 
     ImGuiIO& io = ImGui::GetIO();
     io.AddKeyEvent(ImGuiMod_Ctrl, (mods & GLFW_MOD_CONTROL) != 0);
@@ -173,7 +179,7 @@ void InputManager::keyCallback(GLFWwindow* window, int key, int scancode, int ac
 
 void InputManager::charCallback(GLFWwindow* window, unsigned int codepoint) {
     auto* input = reinterpret_cast<InputManager*>(glfwGetWindowUserPointer(window));
-    if (!input) return; 
+    if (!input) return;
 
     ImGuiIO& io = ImGui::GetIO();
     io.AddInputCharacter(codepoint);

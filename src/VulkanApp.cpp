@@ -84,7 +84,8 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     device.graphicsQueue())
     , sync(device.get(), (uint32_t)swapchainBundle.framebuffers().size(),
             (uint32_t)swapchainBundle.framebuffers().size())
-    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 1000.0f) 
+    , camera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 1000.0f)
+    , playerCamera(70.0f, static_cast<float>(width) / static_cast<float>(height), 0.01f, 1000.0f)
     , imgui(    window.get(),
                 instance.get(),
                 device.physical(),
@@ -134,10 +135,24 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     });
 
     debugUI.addPanel("Camera", [this]() {
+        if (appMode == AppMode::Edit) {
             glm::vec3 pos = camera.position();
-            ImGui::Text("Position: %.0f, %.0f, %.0f", pos.x, pos.y, pos.z);
+            ImGui::Text("Mode: Edit");
+            ImGui::Text("Position: %.1f, %.1f, %.1f", pos.x, pos.y, pos.z);
             ImGui::Text("Yaw: %.1f  Pitch: %.1f", camera.yaw(), camera.pitch());
-    });
+        } else {
+            const auto& body = player.body();
+            ImGui::Text("Mode: Play");
+            ImGui::Text("Position: %.1f, %.1f, %.1f",
+                    body.position.x, body.position.y, body.position.z);
+            ImGui::Text("Velocity: %.1f, %.1f, %.1f",
+                    body.velocity.x, body.velocity.y, body.velocity.z);
+            ImGui::Text("OnGround: %s  Noclip: %s",
+                    body.onGround ? "yes" : "no",
+                    body.noclip   ? "yes" : "no");
+            ImGui::Text("[P] Edit mode  [F] Noclip  [Space] Jump");
+        }     
+    }); 
 
     debugUI.addPanel("Scene", [this]() {
         editor.drawUI(); 
@@ -157,10 +172,43 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 }
 
 void VulkanApp::run() {
+    std::chrono::steady_clock::time_point lastRunTime = startTime;
+
     while (!window.shouldClose()) {
         window.pollEvents();   
         
-        editor.update(input, camera, window.get());
+        auto nowRun = std::chrono::steady_clock::now();
+        float deltaSeconds = std::chrono::duration<float>(nowRun - lastRunTime).count();
+        lastRunTime = nowRun;
+        deltaSeconds = std::min(deltaSeconds, 0.05f); // cap at 50ms to prevent tunnelling on lag spike
+
+        // P key toggles play/edit mode
+        if (input.wasKeyJustPressed(GLFW_KEY_P)) {
+            if (appMode == AppMode::Edit) {
+                appMode = AppMode::Play;
+                // spawn player at editor camera position
+                glm::vec3 spawnPos = camera.position();
+                spawnPos.y -= player.cfg.eyeHeight;
+                if (spawnPos.y < 0.0f) spawnPos.y = 0.0f;
+                player.setPosition(spawnPos);
+                input.setUIMode(false); // lock cursor for play mode
+                Log::info("Entered Play mode — F to toggle noclip, P to return");
+            } else {
+                appMode = AppMode::Edit;
+                // return editor camera to player eye position
+                camera.setPosition(player.eyePosition());
+                camera.setOrientation(player.yaw(), player.pitch());
+                input.setUIMode(true); // release cursor for edit mode
+                Log::info("Returned to Edit mode");
+            }
+        }
+        if (appMode == AppMode::Edit) {
+            editor.update(input, camera, window.get());
+        } else {
+            player.update(input, physicsSolver, editor.getCubes(), deltaSeconds);
+            playerCamera.setPosition(player.eyePosition());
+            playerCamera.setOrientation(player.yaw(), player.pitch());
+        }
         input.update();
         drawFrame();
     }
@@ -211,6 +259,7 @@ glm::vec3 VulkanApp::raycastGrid(double mouseX, double mouseY) const {
 
 void VulkanApp::drawFrame(){
     VkDevice dev = device.get();
+    Camera& activeCamera = (appMode == AppMode::Play) ? playerCamera : camera;
 
     if (input.framebufferWasResized()) {
         input.clearFramebufferResized();
@@ -260,8 +309,8 @@ void VulkanApp::drawFrame(){
     frameTimes[frameTimeIndex] = deltaSeconds * 1000.0f;
     frameTimeIndex = (frameTimeIndex + 1) % FRAME_TIME_COUNT;
 
-    if (!input.inUIMode()) {
-        camera.processKeyboard(window.get(), deltaSeconds);
+    if (appMode == AppMode::Edit && !input.inUIMode()) {
+        camera.processKeyboard(window.get(), deltaSeconds);  
         camera.processMouse(input.mouseDeltaX(), input.mouseDeltaY());
     }
 
@@ -273,10 +322,10 @@ void VulkanApp::drawFrame(){
     ImGui::End();
 
     UniformBuffer::MVPData mvp{};
-    mvp.view = camera.viewMatrix();
-    mvp.projection = camera.projectionMatrix();
-    mvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
-    mvp.viewPos = glm::vec4(camera.position(), 1.0f);
+    mvp.view = activeCamera.viewMatrix(); 
+    mvp.projection = activeCamera.projectionMatrix(); 
+    mvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f); 
+    mvp.viewPos = glm::vec4(activeCamera.position(), 1.0f); 
     uniformBuffer.update(imageIndex, mvp);
 
     TriangleRenderer::PushConstants pushConstants{};
@@ -285,7 +334,7 @@ void VulkanApp::drawFrame(){
     pushConstants.frameIndex = frameIndex++;
     Log::setFrame(frameIndex);
 
-    recordCommandBuffer(cmd, imageIndex, pushConstants);
+    recordCommandBuffer(cmd, imageIndex, pushConstants, activeCamera);
 
     // submit
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -326,7 +375,9 @@ void VulkanApp::drawFrame(){
     sync.advanceFrame();
 }
 
-void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const TriangleRenderer::PushConstants& pushConstants) {
+void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
+                            const TriangleRenderer::PushConstants& pushConstants,
+                            const Camera& activeCamera) {
     VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     if (vkBeginCommandBuffer(cmd, &bi) != VK_SUCCESS) {
         throw std::runtime_error("vkBeginCommandBuffer failed");
@@ -535,10 +586,10 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
 
         if (!lineBatch.empty()) {
             UniformBuffer::MVPData lineMvp{}; 
-            lineMvp.view = camera.viewMatrix();
-            lineMvp.projection = camera.projectionMatrix();
-            lineMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f);
-            lineMvp.viewPos = glm::vec4(camera.position(), 1.0f);
+            lineMvp.view = activeCamera.viewMatrix(); 
+            lineMvp.projection = activeCamera.projectionMatrix();
+            lineMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f); 
+            lineMvp.viewPos = glm::vec4(activeCamera.position(), 1.0f);
             uniformBuffer.update(imageIndex, lineMvp);
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lineRenderer.getPipeline());
@@ -571,7 +622,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, co
         gizmoScissor.extent = { GIZMO_SIZE, GIZMO_SIZE };
         vkCmdSetScissor(cmd, 0, 1, &gizmoScissor); 
         
-        glm::mat4 rotOnlyView = glm::mat4(glm::mat3(camera.viewMatrix()));
+        glm::mat4 rotOnlyView = glm::mat4(glm::mat3(activeCamera.viewMatrix())); 
         rotOnlyView[3][2] = -2.0f;
         glm::mat4 gizmoProj = glm::ortho(-1.2f, 1.2f, 1.2f, -1.2f, 0.1f, 10.0f);
 
@@ -627,4 +678,5 @@ void VulkanApp::recreateSwapchain() {
     );
 
     camera.setAspectRatio(static_cast<float>(fb.first) / static_cast<float>(fb.second));
+    playerCamera.setAspectRatio(static_cast<float>(fb.first) / static_cast<float>(fb.second));
 }
