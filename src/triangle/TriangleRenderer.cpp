@@ -10,7 +10,7 @@
 #include <vector>
 #include <array>
 
-static_assert(sizeof(TriangleRenderer::PushConstants) == 80, "Push constants must be 80 bytes");
+static_assert(sizeof(TriangleRenderer::PushConstants) == 96, "Push constants must be 96 bytes");
 
 namespace{
 std::vector<std::uint32_t> readFileWords(const std::filesystem::path& path) {
@@ -172,11 +172,13 @@ TriangleRenderer::TriangleRenderer(VkDevice dev, VkRenderPass rp, VkDescriptorSe
             throw std::runtime_error("vkCreateGraphicsPipeline (wireframe) failed");
         }
 
-        vertModule = tmpVert;
-        fragModule = tmpFrag;
         pipelineLayout = tmpLayout;
         pipeline = tmpPipeline;
         wireframePipeline = tmpWireframe;
+        vkDestroyShaderModule(device, tmpVert, nullptr);
+        vkDestroyShaderModule(device, tmpFrag, nullptr);
+        tmpVert = VK_NULL_HANDLE;
+        tmpFrag = VK_NULL_HANDLE;
     } catch (...) {
         if (tmpPipeline) vkDestroyPipeline(device, tmpPipeline, nullptr);
         if (tmpLayout) vkDestroyPipelineLayout(device, tmpLayout, nullptr);
@@ -190,15 +192,11 @@ void TriangleRenderer::destroy() noexcept{
     if (device != VK_NULL_HANDLE) {
         if (pipeline) vkDestroyPipeline(device, pipeline, nullptr);
         if (wireframePipeline) vkDestroyPipeline(device, wireframePipeline, nullptr);
-        if (pipelineLayout) vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        if (vertModule) vkDestroyShaderModule(device, vertModule, nullptr);
-        if (fragModule) vkDestroyShaderModule(device, fragModule, nullptr);
+        if (pipelineLayout) vkDestroyPipelineLayout(device, pipelineLayout, nullptr); 
     }
     pipeline = VK_NULL_HANDLE;
     wireframePipeline = VK_NULL_HANDLE;
-    pipelineLayout = VK_NULL_HANDLE;
-    vertModule = VK_NULL_HANDLE;
-    fragModule = VK_NULL_HANDLE;
+    pipelineLayout = VK_NULL_HANDLE; 
     renderPass = VK_NULL_HANDLE;
     device = VK_NULL_HANDLE;
 }
@@ -208,16 +206,12 @@ TriangleRenderer::TriangleRenderer(TriangleRenderer&& o) noexcept
             renderPass(o.renderPass),
             pipelineLayout(o.pipelineLayout),
             pipeline(o.pipeline),
-            wireframePipeline(o.wireframePipeline),
-            vertModule(o.vertModule),
-            fragModule(o.fragModule){
+            wireframePipeline(o.wireframePipeline){
     o.device = VK_NULL_HANDLE;
     o.renderPass = VK_NULL_HANDLE;
     o.pipelineLayout = VK_NULL_HANDLE;
     o.pipeline = VK_NULL_HANDLE;
-    o.wireframePipeline = VK_NULL_HANDLE;
-    o.vertModule = VK_NULL_HANDLE;
-    o.fragModule = VK_NULL_HANDLE;
+    o.wireframePipeline = VK_NULL_HANDLE;  
 }
 
 TriangleRenderer& TriangleRenderer::operator=(TriangleRenderer&& o) noexcept {
@@ -227,15 +221,11 @@ TriangleRenderer& TriangleRenderer::operator=(TriangleRenderer&& o) noexcept {
     renderPass = o.renderPass;
     pipelineLayout = o.pipelineLayout;
     pipeline = o.pipeline;
-    wireframePipeline = o.wireframePipeline;
-    vertModule = o.vertModule;
-    fragModule = o.fragModule;
+    wireframePipeline = o.wireframePipeline; 
     o.device = VK_NULL_HANDLE;
     o.renderPass = VK_NULL_HANDLE;
     o.pipelineLayout = VK_NULL_HANDLE;
-    o.pipeline = VK_NULL_HANDLE;
-    o.vertModule = VK_NULL_HANDLE;
-    o.fragModule = VK_NULL_HANDLE;
+    o.pipeline = VK_NULL_HANDLE; 
     return *this;
 }
 

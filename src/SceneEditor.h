@@ -19,7 +19,7 @@ public:
         Move
     };
 
-    SceneEditor() { newProject(); } 
+    SceneEditor() { newProject(); }  
 
     void update(const InputManager& input, const Camera& camera, GLFWwindow* window);
     void drawUI();
@@ -57,6 +57,9 @@ public:
     void redo();
     bool canUndo() const { return historyCursor > 0; }
     bool canRedo() const { return historyCursor < static_cast<int>(history.size()) - 1; }
+
+    void applyColorToSelection(const glm::vec3& color);
+    void setActiveColor(const glm::vec3& color) { activeColor = color; }
 
 private:
     void pushSnapshot();
@@ -100,6 +103,7 @@ private:
 
     bool moving = false;
     glm::vec3 moveOffset{0.0f};
+    glm::vec3 activeColor = glm::vec3(1.0f); 
 
     // multi-select and clipboard
     std::unordered_set<int> multiSelected;

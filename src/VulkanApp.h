@@ -30,6 +30,7 @@
 #include "AppMode.h"
 #include "PlayerController.h"
 #include "PhysicsSolver.h"
+#include "MaterialPanel.h"
 
 #include <chrono>
 #include <cstdint>
@@ -79,7 +80,8 @@ private:
     FrameSync sync;
     Camera camera;
     ImGuiLayer imgui;
-    DebugUI debugUI; 
+    DebugUI debugUI;
+    MaterialPanel materialPanel;
     float lightPos[3] = { 5.0f, 10.0f, 5.0f };
     char sceneFilename[256] = "scene.alethia";
     bool wireframe = false;

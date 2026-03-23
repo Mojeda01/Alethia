@@ -13,6 +13,7 @@ layout(push_constant) uniform Push {
     layout(offset = 8) uint frameIndex;
     layout(offset = 12) float pad;
     layout(offset = 16) mat4 model;
+    layout(offset = 80) vec4 color;
 } pc;
 
 layout(location = 0) in vec3 inPosition;
@@ -26,6 +27,8 @@ layout(location = 2) out vec3 vWorldPos;
 layout(location = 3) out float vDist;
 layout(location = 4) out vec2 vTexCoord;
 
+layout(location = 5) out vec4 vCubeColor;
+
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0); 
     gl_Position = mvp.projection * mvp.view * worldPos;
@@ -35,4 +38,5 @@ void main() {
     vColor = inColor;
     vDist = length(mvp.viewPos.xyz - worldPos.xyz);
     vTexCoord = inTexCoord;
+    vCubeColor = pc.color;
 }

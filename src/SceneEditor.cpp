@@ -285,6 +285,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) { 
                 cubes.push_back(preview);
                 int newIndex = static_cast<int>(cubes.size()) - 1;
+                cubes[newIndex].color = activeColor;
                 multiSelected.clear();
                 multiSelected.insert(newIndex);
                 selected = newIndex;
@@ -672,10 +673,11 @@ bool SceneEditor::saveToFile(const std::string& filename) const {
         return false;
     }
 
-    file << "alethia v1 snap=" << gridSnap << "\n";
+    file << "alethia v2 snap=" << gridSnap << "\n";
     for (const auto& cube : cubes) {
-        file << cube.min.x << " " << cube.min.y << " " << cube.min.z << " "
-             << cube.max.x << " " << cube.max.y << " " << cube.max.z << "\n";
+        file    << cube.min.x << " " << cube.min.y << " " << cube.min.z << " "
+                << cube.max.x << " " << cube.max.y << " " << cube.max.z << " "
+                << cube.color.r << " " << cube.color.g << " " << cube.color.b << "\n";
     }
 
     file.close();
@@ -693,9 +695,14 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
     std::string header;
     std::getline(file, header);
 
-    if (header.find("alethia v1") == std::string::npos) {
+    bool isV2 = header.find("alethia v2") != std::string::npos;
+    bool isV1 = header.find("alethia v1") != std::string::npos;
+    if (!isV1 && !isV2) {
         Log::error("Invalid file format: " + filename);
         return false;
+    }
+    if (isV1) {
+        Log::warn("Loading v1 scene — colors defaulted to white");
     }
 
     auto snapPos = header.find("snap=");
@@ -704,12 +711,23 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
     }
 
     std::vector<AABB> loaded;
-    float minX, minY, minZ, maxX, maxY, maxZ;
-    while (file >> minX >> minY >> minZ >> maxX >> maxY >> maxZ) {
-        AABB cube;
-        cube.min = glm::vec3(minX, minY, minZ);
-        cube.max = glm::vec3(maxX, maxY, maxZ);
-        loaded.push_back(cube);
+    float minX, minY, minZ, maxX, maxY, maxZ, r, g, b;
+    if (isV2) {
+        while (file >> minX >> minY >> minZ >> maxX >> maxY >> maxZ >> r >> g >> b) {
+            AABB cube;
+            cube.min = glm::vec3(minX, minY, minZ);
+            cube.max = glm::vec3(maxX, maxY, maxZ);
+            cube.color = glm::vec3(r, g, b);
+            loaded.push_back(cube);
+        }
+    } else {
+        while (file >> minX >> minY >> minZ >> maxX >> maxY >> maxZ) {
+            AABB cube;
+            cube.min = glm::vec3(minX, minY, minZ);
+            cube.max = glm::vec3(maxX, maxY, maxZ);
+            cube.color = glm::vec3(1.0f);
+            loaded.push_back(cube);
+        }
     }
 
     file.close();
@@ -824,4 +842,18 @@ void SceneEditor::drawUI() {
     ImGui::Text("[1] Place  [2] Select [3] Slice [4] Move  [Del] Delete\n"
                 "[Shift+Click] Multi-select  [CMD+C] Copy  [CMD+V] Paste\n"
                 "[Shift+Drag] Move Y-axis");
+}
+
+void SceneEditor::applyColorToSelection(const glm::vec3& color) {
+    if (multiSelected.empty()) return;
+    pushSnapshot();
+    for (int idx : multiSelected) {
+        if (idx >= 0 && idx < static_cast<int>(cubes.size())) {
+            cubes[idx].color = color;
+        }
+    }
+    activeColor = color;
+    Log::info("Applied color to " + std::to_string(multiSelected.size()) +
+            " cube(s)");
+
 }

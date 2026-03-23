@@ -202,6 +202,12 @@ void VulkanApp::run() {
                 Log::info("Returned to Edit mode");
             }
         }
+
+        if (input.wasKeyJustPressed(GLFW_KEY_M) &&
+                !input.imguiWantsKeyboard() &&
+                appMode == AppMode::Edit) {
+            materialPanel.visible = !materialPanel.visible;
+        }
         if (appMode == AppMode::Edit) {
             editor.update(input, camera, window.get());
         } else {
@@ -316,6 +322,13 @@ void VulkanApp::drawFrame(){
 
     imgui.newFrame();
     debugUI.draw();
+    materialPanel.draw();
+
+    if (materialPanel.colorWasJustSelected() && appMode == AppMode::Edit) {
+        editor.applyColorToSelection(materialPanel.selectedColor());
+        editor.setActiveColor(materialPanel.selectedColor());
+        materialPanel.clearPendingSelection();
+    }
 
     ImGui::Begin("Log");
     Log::drawPanel();
@@ -444,6 +457,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
         if (hlSize.y < 0.02f) hlSize.y = 0.02f;
         
         TriangleRenderer::PushConstants hlPc = pushConstants;
+        hlPc.color = glm::vec4(1.0f);
         hlPc.model = glm::translate(glm::mat4(1.0f), hlCenter) *
                         glm::scale(glm::mat4(1.0f), hlSize);
         vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
@@ -473,6 +487,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
         glm::vec3 pvSize = pv.size();
         
         TriangleRenderer::PushConstants pvPc = pushConstants;
+        pvPc.color = glm::vec4(1.0f);
         pvPc.model = glm::translate(glm::mat4(1.0f), pvCenter) *
                         glm::scale(glm::mat4(1.0f), pvSize);
         vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
@@ -510,6 +525,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
             TriangleRenderer::PushConstants cubePc = pushConstants;
             cubePc.model = glm::translate(glm::mat4(1.0f), center) *
                             glm::scale(glm::mat4(1.0f), sz);
+            cubePc.color = glm::vec4(cube.color, 1.0f);
             vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
                                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                 0, sizeof(TriangleRenderer::PushConstants), &cubePc);

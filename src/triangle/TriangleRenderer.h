@@ -23,6 +23,7 @@ public:
         std::uint32_t frameIndex = 0;
         float pad = 0.0f;
         glm::mat4 model = glm::mat4(1.0f);
+        glm::vec4 color = glm::vec4(1.0f);  // rgb tint + unused alpha
     };
 
     void record(    VkCommandBuffer cmd,
@@ -55,7 +56,5 @@ private:
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline pipeline = VK_NULL_HANDLE;
-    VkPipeline wireframePipeline = VK_NULL_HANDLE;
-    VkShaderModule vertModule = VK_NULL_HANDLE;
-    VkShaderModule fragModule = VK_NULL_HANDLE;
+    VkPipeline wireframePipeline = VK_NULL_HANDLE; 
 };

@@ -138,6 +138,8 @@ add_executable(VulkanLab
     src/DevTexture.cpp
     src/PhysicsSolver.cpp
     src/PlayerController.cpp
+    src/ColorPalette.cpp
+    src/MaterialPanel.cpp
     src/external/imgui/imgui.cpp
     src/external/imgui/imgui_draw.cpp
     src/external/imgui/imgui_tables.cpp

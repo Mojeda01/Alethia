@@ -5,6 +5,7 @@
 struct AABB{
     glm::vec3 min;
     glm::vec3 max;
+    glm::vec3 color = glm::vec3(1.0f); // white deafult - multiplies with texture.
 
     glm::vec3 center() const { return (min + max) * 0.5f; }
     glm::vec3 size() const { return max - min; }
