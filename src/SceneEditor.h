@@ -1,6 +1,8 @@
 #pragma once
 
 #include "AABB.h"
+#include "SceneObject.h"
+#include "TriangularPrism.h"
 #include "InputManager.h"
 #include "Camera.h"
 
@@ -18,6 +20,13 @@ public:
         Slice,
         Move
     };
+    
+    enum class SliceMode : uint8_t {
+        Axis, // existing axis-aligned slice
+        DiagonalXZ, // diagonal in XZ plane
+        DiagonalXY, // diagonal in XY plane
+        DiagonalYZ  // diagonal in YZ plane
+    };
 
     SceneEditor() { newProject(); }  
 
@@ -28,11 +37,22 @@ public:
     bool saveToFile(const std::string& filename) const;
     bool loadFromFile(const std::string& filename);
 
-    const std::vector<AABB>& getCubes() const { return cubes; }
+    const std::vector<SceneObject>& getObjects() const { return objects; }
+    
+    // backward-compatible helper - returns bounding  AABBs for physics.
+    std::vector<AABB> getCollisionAABBs() const {
+        std::vector<AABB> result;
+        result.reserve(objects.size());
+        for (const auto& obj : objects) {
+            result.push_back(obj.boundingAABB());
+        }
+        return result;
+    }
+    
     int selectedIndex() const { return selected; }
     const std::unordered_set<int>& selectedSet() const { return multiSelected; }
     bool isMultiSelected(int i) const { return multiSelected.count(i) > 0; }
-    bool hasClipboard() const { return !clipboard.empty(); }
+    bool hasClipboard() const { return !clipBoard.empty(); }
 
     bool hasHighlight() const { return highlightValid; }
     glm::vec3 highlightMin() const { return highlightCellMin; }
@@ -49,9 +69,18 @@ public:
     int getSliceAxis() const { return sliceAxis; }
     float getSlicePosition() const { return slicePosition; }
     bool isSlicing() const { return sliceActive && selected >= 0; }
+    bool isDiagonalSliceReady() const {
+        return tool == Tool::Slice && sliceMode != SliceMode::Axis && selected >= 0;
+    }
+    // return the two endpoints of the diagonal cut line for preview rendering
+    bool getDiagonalSlicePreviewLine(glm::vec3& outA, glm::vec3& outB) const;
+    
+    // executes the diagonal slice - called by ImGui button
+    void applyDiagonalSlice();
+    SliceMode getSliceMode() const { return sliceMode; }
 
     bool isPasting() const { return pasting; }
-    const std::vector<AABB>& pastePreviewCubes() const { return pastePreview; }
+    const std::vector<SceneObject>& pastePreviewCubes() const { return pastePreview; }
 
     void undo();
     void redo();
@@ -60,15 +89,18 @@ public:
 
     void applyColorToSelection(const glm::vec3& color);
     void setActiveColor(const glm::vec3& color) { activeColor = color; }
-
+    
+    uint64_t sceneVersion() const { return sceneVer; }
+    
 private:
     void pushSnapshot();
+    uint64_t sceneVer = 0;
     void clearSelection();
     void buildPastePreview(float targetX, float targetY, float targetZ);
     void eraseAndRemap(int index);
     int hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const; 
 
-    std::deque<std::vector<AABB>> history;
+    std::deque<std::vector<SceneObject>> history;
     int historyCursor = -1;
     static constexpr int MAX_HISTORY = 64;
 
@@ -79,7 +111,10 @@ private:
     int hitTestFace(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outT) const;
     float snapValue(float val) const;
 
-    std::vector<AABB> cubes;
+    std::vector<SceneObject> objects;
+    SliceMode sliceMode = SliceMode::Axis;
+    int diagonalCutCorner = 0;
+    
     int selected = -1;
     Tool tool = Tool::Place;
     float gridSnap = 1.0f;
@@ -107,11 +142,11 @@ private:
 
     // multi-select and clipboard
     std::unordered_set<int> multiSelected;
-    std::vector<AABB> clipboard;
+    std::vector<SceneObject> clipBoard;
     glm::vec3 clipboardOrigin{0.0f};
 
     // paste preview
     bool pasting = false;
-    std::vector<AABB> pastePreview;  
+    std::vector<SceneObject> pastePreview;
     
 };

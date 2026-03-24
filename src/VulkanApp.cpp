@@ -4,6 +4,8 @@
 #include "CubeMesh.h"
 #include "Log.h"
 #include "SceneEditor.h"
+#include "SceneObject.h"
+#include "TriangularPrismMesh.h"
 #include <imgui.h>
 
 #define GLM_FORCE_DEPTH_TO_ONE
@@ -208,10 +210,15 @@ void VulkanApp::run() {
                 appMode == AppMode::Edit) {
             materialPanel.visible = !materialPanel.visible;
         }
+        static uint64_t lastSceneVersion = 0;
         if (appMode == AppMode::Edit) {
             editor.update(input, camera, window.get());
+            if (editor.sceneVersion() != lastSceneVersion) {
+                prismCacheDirty = true;
+                lastSceneVersion = editor.sceneVersion();
+            }
         } else {
-            player.update(input, physicsSolver, editor.getCubes(), deltaSeconds);
+            player.update(input, physicsSolver, editor.getObjects(), deltaSeconds);
             playerCamera.setPosition(player.eyePosition());
             playerCamera.setOrientation(player.yaw(), player.pitch());
         }
@@ -261,6 +268,27 @@ glm::vec3 VulkanApp::raycastGrid(double mouseX, double mouseY) const {
         return glm::vec3(0.0f, -10000.0f, 0.0f);
     }
     return rayOrigin + rayDir * t;
+}
+
+void VulkanApp::rebuildPrismCache() {
+    prismCache.clear();
+    const auto& objs = editor.getObjects();
+    for (const auto& obj : objs) {
+        if (obj.type == ShapeType::Prism) {
+            PrismGeometry geo = makePrismMesh(obj.prism);
+            if (!geo.vertices.empty()) {
+                prismCache.push_back(std::make_unique<MeshBuffer>(
+                    device.get(), device.physical(),
+                    commandPool.get(), device.graphicsQueue(),
+                    geo.vertices, geo.indices));
+            } else {
+                prismCache.push_back(nullptr);
+            }
+        } else {
+            prismCache.push_back(nullptr);
+        }
+    }
+    prismCacheDirty = false;
 }
 
 void VulkanApp::drawFrame(){
@@ -346,7 +374,12 @@ void VulkanApp::drawFrame(){
     pushConstants.deltaSeconds = deltaSeconds;
     pushConstants.frameIndex = frameIndex++;
     Log::setFrame(frameIndex);
-
+    
+    if (prismCacheDirty) {
+        vkDeviceWaitIdle(device.get());
+        rebuildPrismCache();
+    }
+    
     recordCommandBuffer(cmd, imageIndex, pushConstants, activeCamera);
 
     // submit
@@ -432,7 +465,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
     vkCmdBindVertexBuffers(cmd, 0, 1, &gridVb, &offset);
     vkCmdDraw(cmd, 6, 1, 0, 0);
     
-    const auto& editorCubes = editor.getCubes();
+    const auto& editorObjects = editor.getObjects();
 
     if (editor.hasHighlight() && editor.activeTool() == SceneEditor::Tool::Place) { 
         VkPipeline scenePipeline = triangle.getPipeline();
@@ -498,7 +531,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
     }
 
     // Draw Cubes
-    if (!editorCubes.empty()) {
+    if (!editorObjects.empty()) {
         VkPipeline scenePipeline = wireframe ? triangle.getWireframePipeline() : triangle.getPipeline();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
 
@@ -517,20 +550,38 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
         vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
 
         
-       
-     for (int i = 0; i < static_cast<int>(editorCubes.size()); ++i) {
-            const AABB& cube = editorCubes[i];
-            glm::vec3 center = cube.center();
-            glm::vec3 sz = cube.size();
-            TriangleRenderer::PushConstants cubePc = pushConstants;
-            cubePc.model = glm::translate(glm::mat4(1.0f), center) *
-                            glm::scale(glm::mat4(1.0f), sz);
-            cubePc.color = glm::vec4(cube.color, 1.0f);
-            vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                                0, sizeof(TriangleRenderer::PushConstants), &cubePc);
-            vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+        for (int objIdx = 0; objIdx < static_cast<int>(editorObjects.size()); ++objIdx) {
+            const auto& obj = editorObjects[objIdx];
+            TriangleRenderer::PushConstants objPc = pushConstants;
+            objPc.color = glm::vec4(obj.color(), 1.0f);
             
+            if (obj.type == ShapeType::Box) {
+                glm::vec3 center = obj.box.center();
+                glm::vec3 sz     = obj.box.size();
+                objPc.model = glm::translate(glm::mat4(1.0f), center) * glm::scale(glm::mat4(1.0f), sz);
+                vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
+                                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                   0, sizeof(TriangleRenderer::PushConstants), &objPc);
+                vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
+            } else {
+                int ci = objIdx < static_cast<int>(prismCache.size()) ? objIdx : -1;
+                if (ci >= 0 && prismCache[ci] != nullptr) {
+                    objPc.model = glm::mat4(1.0f);
+                    vkCmdPushConstants(cmd, triangle.getPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(TriangleRenderer::PushConstants), &objPc);
+                    VkBuffer prismVb = prismCache[ci]->vertexBuffer();
+                    VkDeviceSize prismOffset = 0;
+                    vkCmdBindVertexBuffers(cmd, 0, 1, &prismVb, &prismOffset);
+                    vkCmdBindIndexBuffer(cmd, prismCache[ci]->indexBuffer(),
+                                         0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(cmd, prismCache[ci]->indexCount(), 1, 0, 0, 0);
+                    // rebind cube mesh for subsequent box draws
+                    VkBuffer cubeVb = cubeMesh.vertexBuffer();
+                    vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &prismOffset);
+                    vkCmdBindIndexBuffer(cmd, cubeMesh.indexBuffer(),
+                                         0, VK_INDEX_TYPE_UINT32);
+                }
+                
+              }
         }
     }
 
@@ -545,16 +596,16 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
         glm::vec3 yellow(1.0f, 1.0f, 0.2f);
 
         for (int idx : multiSel) {
-            if (idx >= 0 && idx < static_cast<int>(editorCubes.size())) {
-                 const AABB& box = editorCubes[idx];
-                 lineBatch.addAABBEdges(box.min, box.max, red, green, blue);
+            if (idx >= 0 && idx < static_cast<int>(editorObjects.size())) {
+                AABB box = editorObjects[idx].boundingAABB();
+                lineBatch.addAABBEdges(box.min, box.max, red, green, blue);
             }
         }
 
         // slice plane visualization — only relevant for the single active selected cube
         int sel = editor.selectedIndex();
-        if (sel >= 0 && sel < static_cast<int>(editorCubes.size())) { 
-            const AABB& box = editorCubes[sel];
+        if (sel >= 0 && sel < static_cast<int>(editorObjects.size())) {
+            const AABB box = editorObjects[sel].boundingAABB();
             if (editor.isSlicing()) {
                 int ax = editor.getSliceAxis();
                 float sp = editor.getSlicePosition(); 
@@ -588,13 +639,22 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
                     lineBatch.addLine(c3, c0, yellow);
                 }
             }
+            
+            if (editor.isDiagonalSliceReady()) {
+                glm::vec3 lineA, lineB;
+                if (editor.getDiagonalSlicePreviewLine(lineA, lineB)) {
+                    glm::vec3 orange(1.0f, 0.5f, 0.0f);
+                    lineBatch.addLine(lineA, lineB, orange);
+                }
+            }
         }
         
         // draw paste preview cubes as wireframe outlines
         if (editor.isPasting()) {
-            for (const AABB& pv : editor.pastePreviewCubes()) {
+            for (const SceneObject& pv : editor.pastePreviewCubes()) {
                 glm::vec3 cyan(0.2f, 1.0f, 1.0f);
-                lineBatch.addAABBEdges(pv.min, pv.max, cyan, cyan, cyan);
+                AABB bound = pv.boundingAABB();
+                lineBatch.addAABBEdges(bound.min, bound.max, cyan, cyan, cyan);
             }
         }
 

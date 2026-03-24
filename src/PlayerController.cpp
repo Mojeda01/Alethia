@@ -28,14 +28,14 @@ glm::vec3 PlayerController::eyePosition() const {
 
 void PlayerController::update( const InputManager& input,
                                 PhysicsSolver& solver,
-                                const std::vector<AABB>& world,
+                                const std::vector<SceneObject>& world,
                                 float deltaSeconds)
 {
     handleNoclipToggle(input);
     handleLook(input);
     handleMovement(input, deltaSeconds);
     handleJump(input);
-    solver.step(physicsBody, world, deltaSeconds);
+    solver.stepWithObjects(physicsBody, world, deltaSeconds);
 }
 
 void PlayerController::handleNoclipToggle(const InputManager& input) {

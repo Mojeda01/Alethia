@@ -35,6 +35,8 @@
 #include <chrono>
 #include <cstdint>
 #include <vector>
+#include <optional>
+#include <memory>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -58,6 +60,7 @@ private:
                                 const Camera& activeCamera);
     void recreateSwapchain(); 
     glm::vec3 raycastGrid(double mouseX, double mouseY) const;
+    void rebuildPrismCache();
 private:
     Window window;
     InputManager input;
@@ -74,6 +77,8 @@ private:
     GizmoRenderer gizmo;
     MeshBuffer gizmoMesh;
     MeshBuffer cubeMesh;
+    std::vector<std::unique_ptr<MeshBuffer>> prismCache;
+    bool prismCacheDirty = true;
     DevTexture devTexture;
     LineBatch lineBatch;
     SceneEditor editor; 

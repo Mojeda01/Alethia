@@ -2,6 +2,7 @@
 
 #include "PhysicsBody.h"
 #include "AABB.h"
+#include "SceneObject.h"
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -20,6 +21,11 @@ public:
     void step(  PhysicsBody& body,
                 const std::vector<AABB>& world,
                 float deltaSeconds);
+    
+    // new overload - handles both Box and Prism objects
+    void stepWithObjects(PhysicsBody& body,
+                         const std::vector<SceneObject>& world,
+                         float deltaSeconds);
 
     const Config& config() const { return cfg; }
     Config& config() { return cfg; }
@@ -28,5 +34,8 @@ private:
     void resolveAxis(PhysicsBody& body,
                         const std::vector<AABB>& world,
                         int axis);
+    void resolveAxisObjects(PhysicsBody& body, const std::vector<SceneObject>& world, int axis);
+    void resolvePrism(PhysicsBody& body,
+                      const TriangularPrism& prism);
     Config cfg;
 };

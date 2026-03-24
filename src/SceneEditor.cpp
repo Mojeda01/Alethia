@@ -79,9 +79,9 @@ glm::vec3 SceneEditor::raycastGrid(const InputManager& input, const Camera& came
 }
 
 int SceneEditor::hitTestCube(const glm::vec3& rayOrigin, const glm::vec3& rayDir, int cubeIndex, float& outT) const {
-    if (cubeIndex < 0 || cubeIndex >= static_cast<int>(cubes.size())) return -1;
+    if (cubeIndex < 0 || cubeIndex >= static_cast<int>(objects.size())) return -1;
 
-    const AABB& box = cubes[cubeIndex];
+    const AABB& box = objects[cubeIndex].boundingAABB();
     float tMin = -1e30f;
     float tMax = 1e30f;
     int entryFace = -1;
@@ -126,7 +126,7 @@ void SceneEditor::clearSelection() {
 };
 
 void SceneEditor::eraseAndRemap(int index) {
-    cubes.erase(cubes.begin() + index);
+    objects.erase(objects.begin() + index);
 
     // rebuild multiSelected with shifted indices
     std::unordered_set<int> remapped;
@@ -151,11 +151,12 @@ void SceneEditor::eraseAndRemap(int index) {
 }
 
 void SceneEditor::pushSnapshot() {
+    ++sceneVer;
     if (historyCursor < static_cast<int>(history.size()) - 1) {
         history.erase(history.begin() + historyCursor + 1, history.end());
     }
      
-    history.push_back(cubes);
+    history.push_back(objects);
     historyCursor = static_cast<int>(history.size()) - 1;
 
     // trim oldest if over limit 
@@ -171,9 +172,9 @@ void SceneEditor::undo() {
         return;
     }
     historyCursor--;
-    cubes = history[historyCursor];
+    objects = history[historyCursor];
     clearSelection();
-    Log::info("Undo — " + std::to_string(cubes.size()) + " cube(s)");
+    Log::info("Redo — " + std::to_string(objects.size()) + " object(s)");
 }
 
 void SceneEditor::redo() {
@@ -182,24 +183,30 @@ void SceneEditor::redo() {
         return;
     }
     historyCursor++;
-    cubes = history[historyCursor];
+    objects = history[historyCursor];
     clearSelection();
-    Log::info("Redo — " + std::to_string(cubes.size()) + " cube(s)");
+    Log::info("Undo — " + std::to_string(objects.size()) + " object(s)");
 }
 
 void SceneEditor::buildPastePreview(float targetX, float targetY, float targetZ) {
     pastePreview.clear();
-    if (clipboard.empty()) return;
+    if (clipBoard.empty()) return;
 
     glm::vec3 offset(
         snapValue(targetX) - clipboardOrigin.x,
         targetY - clipboardOrigin.y,
         snapValue(targetZ) - clipboardOrigin.z
     );
-    for (const AABB& src : clipboard) {
-        AABB dst;
-        dst.min = src.min + offset;
-        dst.max = src.max + offset;
+    for (const SceneObject& src : clipBoard) {
+        SceneObject dst = src;
+        if (dst.type == ShapeType::Box) {
+            dst.box.min += offset;
+            dst.box.max += offset;
+        } else {
+            dst.prism.v0 += offset;
+            dst.prism.v1 += offset;
+            dst.prism.v2 += offset;
+        }
         pastePreview.push_back(dst);
     }
 }
@@ -209,7 +216,7 @@ int SceneEditor::hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& ray
     float closestT = 1e30f;
     int hitIndex = -1;
 
-    for (int i = 0; i < static_cast<int>(cubes.size()); ++i){
+    for (int i = 0; i < static_cast<int>(objects.size()); ++i){
         float t = 0.0f;
         int face = hitTestCube(rayOrigin, rayDir, i, t);
         if (face == 2 && t < closestT) {
@@ -218,7 +225,7 @@ int SceneEditor::hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& ray
         }
     }
     if (hitIndex >= 0) {
-        outY = cubes[hitIndex].max.y;
+        outY = objects[hitIndex].boundingAABB().max.y;
     }
     return hitIndex;
 }
@@ -249,7 +256,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 
             if (surfaceHitCube >= 0) {
                 // hovering over a cube top face — highlight the entire top face
-                const AABB& below = cubes[surfaceHitCube];
+                const AABB& below = objects[surfaceHitCube].boundingAABB();
                 highlightCellMin = glm::vec3(below.min.x, below.max.y, below.min.z);
                 highlightCellMax = glm::vec3(below.max.x, below.max.y + 0.02f, below.max.z);
             } else {
@@ -283,9 +290,9 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             preview.max = glm::vec3(maxX, placementY + gridSnap, maxZ);  
 
             if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) { 
-                cubes.push_back(preview);
-                int newIndex = static_cast<int>(cubes.size()) - 1;
-                cubes[newIndex].color = activeColor;
+                objects.push_back(SceneObject::fromBox(preview));
+                int newIndex = static_cast<int>(objects.size()) - 1;
+                objects[newIndex].box.color = activeColor;
                 multiSelected.clear();
                 multiSelected.insert(newIndex);
                 selected = newIndex;
@@ -305,7 +312,11 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
         glm::vec3 rayDir = worldRayDir(input, camera, window);
 
         if (dragFace >= 0 && selected >= 0) {
-            if (input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+            if (objects[selected].type == ShapeType::Prism) {
+                dragFace = -1;
+                Log::warn("Face drag not supported");
+            }
+            if (dragFace >= 0 && input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
                 int ax = dragFace / 2;
                 bool isMax = (dragFace % 2) == 0;
 
@@ -317,7 +328,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                     planeNormal[ax == 0 ? 2 : 0] = 1.0f;
                 }
 
-                AABB& sel = cubes[selected];
+                AABB& sel = objects[selected].box;
                 glm::vec3 facePoint(0.0f);
                 facePoint[ax] = isMax ? sel.max[ax] : sel.min[ax];
 
@@ -331,10 +342,15 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                         if (isMax) {
                             if (newVal > sel.min[ax] + gridSnap * 0.5f) {
                                 sel.max[ax] = newVal;
+                                if (ax == 0) sel.max.x = newVal;
+                                else if (ax == 1) sel.max.y = newVal;
+                                else sel.max.z = newVal;
                             }
                         } else {
                             if (newVal < sel.max[ax] - gridSnap * 0.5f) {
-                                sel.min[ax] = newVal;
+                                if (ax == 0) sel.min.x = newVal;
+                                else if (ax == 1) sel.min.y = newVal;
+                                else sel.min.z = newVal;
                             }
                         }
                     }
@@ -360,7 +376,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                 // find closest hit 
                 float closestT = 1e30f;
                 int hitIndex = -1;
-                for (int i = 0; i < static_cast<int>(cubes.size()); ++i) {
+                for (int i = 0; i < static_cast<int>(objects.size()); ++i) {
                     float t = 0.0f;
                     int face = hitTestCube(rayOrigin, rayDir, i, t);
                     if (face >= 0 && t < closestT) {
@@ -408,27 +424,38 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
         }
     }
     else if (tool == Tool::Slice) {
-            if (selected < 0) {
-                tool = Tool::Select;
-                Log::warn("No cube selected — switching to Select");
-            } else {
-                glm::vec3 rayOrigin = worldRayOrigin(camera);
-                glm::vec3 rayDir = worldRayDir(input, camera, window);
-
-                if (!sliceActive) {
-                    if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
-                        float faceT = 0.0f;
-                        int face = hitTestFace(rayOrigin, rayDir, faceT);
-                        if (face >= 0) {
+        if (selected < 0) {
+            tool = Tool::Select;
+            Log::warn("No cube selected — switching to Select");
+        } else {
+            glm::vec3 rayOrigin = worldRayOrigin(camera);
+            glm::vec3 rayDir = worldRayDir(input, camera, window);
+            
+            if (!sliceActive) {
+                if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                    float faceT = 0.0f;
+                    int face = hitTestFace(rayOrigin, rayDir, faceT);
+                    if (face >= 0) {
+                        if (objects[selected].type == ShapeType::Prism) {
+                            Log::warn("Axis-aligned slice not supported for prisms — use diagonal slice on a box first");
+                            tool = Tool::Select;
+                        } else {
                             sliceAxis = face / 2;
                             sliceActive = true;
-                            const AABB& sel = cubes[selected];
+                            AABB& sel = objects[selected].box;
                             slicePosition = (sel.min[sliceAxis] + sel.max[sliceAxis]) * 0.5f;
                             slicePosition = snapValue(slicePosition);
                             const char* axNames[] = { "X", "Y", "Z" };
                             Log::info(std::string("Slice axis: ") + axNames[sliceAxis]);
                         }
                     }
+                }
+            } else {
+                if (objects[selected].type == ShapeType::Prism) {
+                    sliceActive = false;
+                    sliceAxis = -1;
+                    tool = Tool::Select;
+                    Log::warn("Slice cancelled - prism selected");
                 } else {
                     glm::vec3 planeNormal(0.0f);
                     if (sliceAxis == 1) {
@@ -437,11 +464,12 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                     } else {
                         planeNormal[sliceAxis == 0 ? 2 : 0] = 1.0f;
                     }
-
-                    const AABB& sel = cubes[selected];
+                    
+                    AABB& sel = objects[selected].box;
+                    
                     glm::vec3 facePoint(0.0f);
                     facePoint[sliceAxis] = slicePosition;
-
+                    
                     float denom = glm::dot(planeNormal, rayDir);
                     if (std::abs(denom) > 0.001f) {
                         float t = glm::dot(facePoint - rayOrigin, planeNormal) / denom;
@@ -462,46 +490,46 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                         cubeB.min[sliceAxis] = slicePosition;
                         pushSnapshot();
                         int oldSelected = selected;
-                        cubes.push_back(cubeA);
-                        cubes.push_back(cubeB);
+                        objects.push_back(SceneObject::fromBox(cubeA));
+                        objects.push_back(SceneObject::fromBox(cubeB));
                         eraseAndRemap(oldSelected);
-
+                        
                         Log::info("Cube sliced along " + std::string(1, "XYZ"[sliceAxis]) +
-                                " at " + std::to_string(slicePosition)); 
+                                  " at " + std::to_string(slicePosition));
                         sliceActive = false;
                         sliceAxis = -1;
                         tool = Tool::Select;
                     }
-
+                    
                     if (input.wasKeyJustPressed(GLFW_KEY_ESCAPE)) {
                         sliceActive = false;
                         sliceAxis = -1;
                         tool = Tool::Select;
                         Log::info("Slice cancelled");
                     }
+                    
                 }
             }
         }
-        else if (tool == Tool::Move) {
+    }
+    else if (tool == Tool::Move) {
             if (selected < 0) {
                 tool = Tool::Select;
                 Log::warn("No cube selected — switching to Select");
             } else {
                 if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT)) {
-                    AABB& sel = cubes[selected];
-                    glm::vec3 center = sel.center();
+                    glm::vec3 center = objects[selected].boundingAABB().center();
                     moveOffset = glm::vec3(center.x - snappedX, 0.0f, center.z - snappedZ);
                     moving = true;
                 } 
                 if (moving && input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
-                    AABB& sel = cubes[selected];
-                    glm::vec3 sz = sel.size();
+                    glm::vec3 sz = objects[selected].boundingAABB().size();
                     if (input.isKeyPressed(GLFW_KEY_LEFT_SHIFT) || input.isKeyPressed(GLFW_KEY_RIGHT_SHIFT)) {
                         glm::vec3 rayOrigin = worldRayOrigin(camera);
                         glm::vec3 rayDir = worldRayDir(input, camera, window);
 
                         glm::vec3 camFlat = glm::normalize(glm::vec3(rayDir.x, 0.0f, rayDir.z));
-                        glm::vec3 cubeCenter = sel.center();
+                        glm::vec3 cubeCenter = objects[selected].boundingAABB().center();
                         float denom = glm::dot(camFlat, rayDir);
                         if (std::abs(denom) > 0.001f) {
                             float t = glm::dot(cubeCenter - rayOrigin, camFlat) / denom;
@@ -509,8 +537,16 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                                 glm::vec3 worldPoint = rayOrigin + rayDir * t;
                                 float newY = snapValue(worldPoint.y - sz.y * 0.5f);
                                 if (newY < 0.0f) newY = 0.0f;
-                                sel.min.y = newY;
-                                sel.max.y = newY + sz.y;
+                                if (objects[selected].type == ShapeType::Box) {
+                                    objects[selected].box.min.y = newY;
+                                    objects[selected].box.max.y = newY + sz.y;
+                                } else {
+                                    float delta = newY - objects[selected].prism.v0.y;
+                                    objects[selected].prism.v0.y += delta;
+                                    objects[selected].prism.v1.y += delta;
+                                    objects[selected].prism.v2.y += delta;
+                                }
+                                ++sceneVer;
                             }
                         }
                     } else {
@@ -518,10 +554,20 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                         float newCenterZ = snappedZ + moveOffset.z;
                         newCenterX = snapValue(newCenterX);
                         newCenterZ = snapValue(newCenterZ);
-                        sel.min.x = newCenterX - sz.x * 0.5f;
-                        sel.max.x = newCenterX + sz.x * 0.5f;
-                        sel.min.z = newCenterZ - sz.z * 0.5f;
-                        sel.max.z = newCenterZ + sz.z * 0.5f;
+                        if (objects[selected].type == ShapeType::Box) {
+                            objects[selected].box.min.x = newCenterX - sz.x * 0.5f;
+                            objects[selected].box.max.x = newCenterX + sz.x * 0.5f;
+                            objects[selected].box.min.z = newCenterZ - sz.z * 0.5f;
+                            objects[selected].box.max.z = newCenterZ + sz.z * 0.5f;
+                        } else {
+                            glm::vec3 oldCenter = objects[selected].boundingAABB().center();
+                            glm::vec3 delta(newCenterX - oldCenter.x, 0.0f,
+                                            newCenterZ - oldCenter.z);
+                            objects[selected].prism.v0 += delta;
+                            objects[selected].prism.v1 += delta;
+                            objects[selected].prism.v2 += delta;
+                        }
+                        ++sceneVer;
                     }
                 }
 
@@ -544,22 +590,22 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 
     if (cmdHeld && input.wasKeyJustPressed(GLFW_KEY_C)) {
         if (!multiSelected.empty()) {
-            clipboard.clear();
+            clipBoard.clear();
 
             // compute bounding center of all selected cubes as clipboard again.
             glm::vec3 totalMin(1e30f), totalMax(-1e30f);
             for (int idx : multiSelected) {
-                totalMin = glm::min(totalMin, cubes[idx].min);
-                totalMax = glm::max(totalMax, cubes[idx].max);
+                totalMin = glm::min(totalMin, objects[idx].boundingAABB().min);
+                totalMax = glm::max(totalMax, objects[idx].boundingAABB().max);
             }
             clipboardOrigin = (totalMin + totalMax) * 0.5f;
             clipboardOrigin.x = snapValue(clipboardOrigin.x);
             clipboardOrigin.z = snapValue(clipboardOrigin.z);
 
             for (int idx : multiSelected) {
-                clipboard.push_back(cubes[idx]);
+                clipBoard.push_back(objects[idx]);
             }
-            Log::info("Copied " + std::to_string(clipboard.size()) + " cube(s)");
+            Log::info("Copied " + std::to_string(clipBoard.size()) + " cube(s)");
         } else {
             Log::warn("Nothing selected to copy");
         }
@@ -567,10 +613,9 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 
     // CMD+V — begin paste mode
     if (cmdHeld && input.wasKeyJustPressed(GLFW_KEY_V)) {
-        if (!clipboard.empty()) {
+        if (!clipBoard.empty()) {
             pasting = true;
-            Log::info("Paste mode — click to place " +
-                        std::to_string(clipboard.size()) + " cube(s)");
+            Log::info("Paste mode — click to place " + std::to_string(clipBoard.size()) + " cube(s)");
         } else {
             Log::warn("Clipboard is empty");
         }
@@ -586,7 +631,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
     }
 
     // paste mode — active after CMD+V until click or Escape
-    if (pasting && !clipboard.empty()) {
+    if (pasting && !clipBoard.empty()) {
         // surface-aware raycast same as Place tool
         glm::vec3 rayOrigin = worldRayOrigin(camera);
         glm::vec3 rayDir    = worldRayDir(input, camera, window);
@@ -599,9 +644,9 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 
         if (input.wasMouseButtonJustPressed(GLFW_MOUSE_BUTTON_LEFT) && !input.imguiWantsMouse()) {
             // commit paste — add all preview cubes to scene
-            for (const AABB& cube : pastePreview) {
-                multiSelected.insert(static_cast<int>(cubes.size()));
-                cubes.push_back(cube);
+            for (const SceneObject& obj : pastePreview) {
+                multiSelected.insert(static_cast<int>(objects.size()));
+                objects.push_back(obj);
             }
             // set selected to first pasted cube for immediate editing
             if (!multiSelected.empty()) {
@@ -652,7 +697,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 void SceneEditor::newProject() {
     history.clear();
     historyCursor = -1;
-    cubes.clear();
+    objects.clear();
     clearSelection();
     pushSnapshot();
     sliceActive = false;
@@ -660,7 +705,7 @@ void SceneEditor::newProject() {
     moving = false;
     tool = Tool::Place;
     gridSnap = 1.0f;
-    clipboard.clear();
+    clipBoard.clear();
     pastePreview.clear();
     pasting = false;
     Log::info("New project created");
@@ -673,15 +718,26 @@ bool SceneEditor::saveToFile(const std::string& filename) const {
         return false;
     }
 
-    file << "alethia v2 snap=" << gridSnap << "\n";
-    for (const auto& cube : cubes) {
-        file    << cube.min.x << " " << cube.min.y << " " << cube.min.z << " "
-                << cube.max.x << " " << cube.max.y << " " << cube.max.z << " "
-                << cube.color.r << " " << cube.color.g << " " << cube.color.b << "\n";
+    file << "alethia v3 snap=" << gridSnap << "\n";
+    for (const auto& obj : objects) {
+        if (obj.type == ShapeType::Box) {
+            const AABB& b = obj.box;
+            file << "box "
+            << b.min.x << " " << b.min.y << " " << b.min.z << " "
+            << b.max.x << " " << b.max.y << " " << b.max.z << " "
+            << b.color.r << " " << b.color.g << " " << b.color.b << "\n";
+        } else {
+            const TriangularPrism& p = obj.prism;
+            file << "prism "
+            << p.v0.x << " " << p.v0.y << " " << p.v0.z << " "
+            << p.v1.x << " " << p.v1.y << " " << p.v1.z << " "
+            << p.v2.x << " " << p.v2.y << " " << p.v2.z << " "
+            << p.extrudeDir.x << " " << p.extrudeDir.y << " " << p.extrudeDir.z << " "
+            << p.color.r << " " << p.color.g << " " << p.color.b << "\n";
+        }
     }
-
     file.close();
-    Log::info("Saved " + std::to_string(cubes.size()) + " cubes to " + filename);
+    Log::info("Saved " + std::to_string(objects.size()) + " objects to " + filename);
     return true;
 }
 
@@ -710,29 +766,58 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
         gridSnap = std::stof(header.substr(snapPos + 5));
     }
 
-    std::vector<AABB> loaded;
+    std::vector<SceneObject> loaded;
     float minX, minY, minZ, maxX, maxY, maxZ, r, g, b;
-    if (isV2) {
+    bool isV3 = header.find("alethia v3") != std::string::npos;
+    
+    if (isV3) {
+        std::string tag;
+        while (file >> tag) {
+            if (tag == "box") {
+                file >> minX >> minY >> minZ >> maxX >> maxY >> maxZ >> r >> g >> b;
+                AABB box;
+                box.min = glm::vec3(minX, minY, minZ);
+                box.max = glm::vec3(maxX, maxY, maxZ);
+                box.color = glm::vec3(r, g, b);
+                loaded.push_back(SceneObject::fromBox(box));
+            } else if (tag == "prism") {
+                float v0x, v0y, v0z, v1x, v1y, v1z, v2x, v2y, v2z;
+                float ex, ey, ez;
+                file >> v0x >> v0y >> v0z
+                >> v1x >> v1y >> v1z
+                >> v2x >> v2y >> v2z
+                >> ex  >> ey  >> ez
+                >> r   >> g   >> b;
+                TriangularPrism p;
+                p.v0 = glm::vec3(v0x, v0y, v0z);
+                p.v1 = glm::vec3(v1x, v1y, v1z);
+                p.v2 = glm::vec3(v2x, v2y, v2z);
+                p.extrudeDir = glm::vec3(ex, ey, ez);
+                p.color = glm::vec3(r, g, b);
+                loaded.push_back(SceneObject::fromPrism(p));
+            }
+        }
+    } else if (isV2) {
         while (file >> minX >> minY >> minZ >> maxX >> maxY >> maxZ >> r >> g >> b) {
-            AABB cube;
-            cube.min = glm::vec3(minX, minY, minZ);
-            cube.max = glm::vec3(maxX, maxY, maxZ);
-            cube.color = glm::vec3(r, g, b);
-            loaded.push_back(cube);
+            AABB box;
+            box.min = glm::vec3(minX, minY, minZ);
+            box.max = glm::vec3(maxX, maxY, maxZ);
+            box.color = glm::vec3(r, g, b);
+            loaded.push_back(SceneObject::fromBox(box));
         }
     } else {
         while (file >> minX >> minY >> minZ >> maxX >> maxY >> maxZ) {
-            AABB cube;
-            cube.min = glm::vec3(minX, minY, minZ);
-            cube.max = glm::vec3(maxX, maxY, maxZ);
-            cube.color = glm::vec3(1.0f);
-            loaded.push_back(cube);
+            AABB box;
+            box.min = glm::vec3(minX, minY, minZ);
+            box.max = glm::vec3(maxX, maxY, maxZ);
+            box.color = glm::vec3(1.0f);
+            loaded.push_back(SceneObject::fromBox(box));
         }
     }
-
+    
     file.close();
-
-    cubes = std::move(loaded);
+    
+    objects = std::move(loaded);
     history.clear();
     historyCursor = -1;
     pushSnapshot();
@@ -743,8 +828,8 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
     pasting = false;
     pastePreview.clear();
     tool = Tool::Select;
-
-    Log::info("Loaded " + std::to_string(cubes.size()) + " cubes from " + filename);
+    Log::info("Loaded " + std::to_string(objects.size()) + " objects from " + filename);
+    
     return true;
 }
 
@@ -766,40 +851,48 @@ void SceneEditor::drawUI() {
     }
     ImGui::SliderFloat("Snap", &gridSnap, 0.125f, 4.0f, "%.3f");
     ImGui::Separator();
-    ImGui::Text("Cubes: %zu", cubes.size());
+    ImGui::Text("Objects: %zu", objects.size());
     if (selected >= 0) {
         ImGui::Text("Selected: %d", selected);
-        AABB& sel = cubes[selected];
-        glm::vec3 pos = sel.center();
-        glm::vec3 sz = sel.size();
-
-        if (ImGui::DragFloat3("Position", &pos.x, gridSnap, -500.0f, 500.0f, "%.2f")) {
-            glm::vec3 half = sz * 0.5f;
-            sel.min = pos - half;
-            sel.max = pos + half;
+        if (objects[selected].type == ShapeType::Box) {
+            AABB& sel = objects[selected].box;
+            glm::vec3 pos = sel.center();
+            glm::vec3 sz = sel.size();
+            if (ImGui::DragFloat3("Position", &pos.x, gridSnap, -500.0f, 500.0f, "%.2f")) {
+                glm::vec3 half = sz * 0.5f;
+                sel.min = pos - half;
+                sel.max = pos + half;
+            }
+            if (ImGui::DragFloat("Width (X)", &sz.x, gridSnap, gridSnap, 500.0f, "%.2f")) {
+                if (sz.x < gridSnap) sz.x = gridSnap;
+                float cx = sel.center().x;
+                sel.min.x = cx - sz.x * 0.5f;
+                sel.max.x = cx + sz.x * 0.5f;
+            }
+            if (ImGui::DragFloat("Height (Y)", &sz.y, gridSnap, gridSnap, 500.0f, "%.2f")) {
+                if (sz.y < gridSnap) sz.y = gridSnap;
+                sel.max.y = sel.min.y + sz.y;
+            }
+            if (ImGui::DragFloat("Depth (Z)", &sz.z, gridSnap, gridSnap, 500.0f, "%.2f")) {
+                if (sz.z < gridSnap) sz.z = gridSnap;
+                float cz = sel.center().z;
+                sel.min.z = cz - sz.z * 0.5f;
+                sel.max.z = cz + sz.z * 0.5f;
+            }
+            ImGui::Separator();
+            ImGui::Text("Min: %.2f, %.2f, %.2f", sel.min.x, sel.min.y, sel.min.z);
+            ImGui::Text("Max: %.2f, %.2f, %.2f", sel.max.x, sel.max.y, sel.max.z);
+        } else {
+            AABB bound = objects[selected].boundingAABB();
+            glm::vec3 center = bound.center();
+            glm::vec3 sz = bound.size();
+            ImGui::Text("Type: Triangular Prism");
+            ImGui::Text("Center: %.2f, %.2f, %.2f", center.x, center.y, center.z);
+            ImGui::Text("Bounds: %.2f x %.2f x %.2f", sz.x, sz.y, sz.z);
+            ImGui::Separator();
+            ImGui::Text("Min: %.2f, %.2f, %.2f", bound.min.x, bound.min.y, bound.min.z);
+            ImGui::Text("Max: %.2f, %.2f, %.2f", bound.max.x, bound.max.y, bound.max.z);
         }
-
-        if (ImGui::DragFloat("Width (X)", &sz.x, gridSnap, gridSnap, 500.0f, "%.2f")) {
-            if (sz.x < gridSnap) sz.x = gridSnap;
-            float cx = sel.center().x;
-            sel.min.x = cx - sz.x * 0.5f;
-            sel.max.x = cx + sz.x * 0.5f;
-        }
-
-        if (ImGui::DragFloat("Height (Y)", &sz.y, gridSnap, gridSnap, 500.0f, "%.2f")) {
-            if (sz.y < gridSnap) sz.y = gridSnap;
-            sel.max.y = sel.min.y + sz.y;
-        }
-
-        if (ImGui::DragFloat("Depth (Z)", &sz.z, gridSnap, gridSnap, 500.0f, "%.2f")) {
-            if (sz.z < gridSnap) sz.z = gridSnap;
-            float cz = sel.center().z;
-            sel.min.z = cz - sz.z * 0.5f;
-            sel.max.z = cz + sz.z * 0.5f;
-        }
-        ImGui::Separator();
-        ImGui::Text("Min: %.2f, %.2f, %.2f", sel.min.x, sel.min.y, sel.min.z);
-        ImGui::Text("Max: %.2f, %.2f, %.2f", sel.max.x, sel.max.y, sel.max.z);
 
         if (dragFace >= 0) {
             const char* faceNames[] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
@@ -809,16 +902,38 @@ void SceneEditor::drawUI() {
             const char* axNames[] = { "X", "Y", "Z" };
             ImGui::Text("Slicing along %s at %.2f", axNames[sliceAxis], slicePosition);
         }
+        if (tool == Tool::Slice) {
+            ImGui::Separator();
+            const char* sliceModeNames[] = {
+                "Axis-Aligned", "Diagonal XZ", "Diagonal XY", "Diagonal YZ"
+            };
+            int sm = static_cast<int>(sliceMode);
+            if (ImGui::Combo("Slice Mode", &sm, sliceModeNames, 4)) {
+                sliceMode = static_cast<SliceMode>(sm);
+            }
+            if (sliceMode != SliceMode::Axis) {
+                ImGui::SliderInt("Cut Corner", &diagonalCutCorner, 0, 3);
+                ImGui::Text("0=min-X/min-Z  1=max-X/min-Z");
+                ImGui::Text("2=max-X/max-Z  3=min-X/max-Z");
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
+                if (ImGui::Button("Apply Diagonal Slice", ImVec2(-1, 0))) {
+                    applyDiagonalSlice();
+                }
+                ImGui::PopStyleColor();
+            }
+        }
     }
     if (ImGui::Button("Clear All")) {
         pushSnapshot();
-        cubes.clear();
-        clearSelection(); 
+        objects.clear();
+        clearSelection();
         Log::info("All cubes cleared");
     }
     ImGui::Separator();
-    if (!clipboard.empty()) {
-        ImGui::Text("Clipboard: %zu cube(s)", clipboard.size());
+    if (!clipBoard.empty()) {
+        ImGui::Text("Clipboard: %zu cube(s)", clipBoard.size());
     }
     ImGui::Text("History: %d step(s)", historyCursor + 1);
     ImGui::BeginDisabled(!canUndo());
@@ -848,8 +963,8 @@ void SceneEditor::applyColorToSelection(const glm::vec3& color) {
     if (multiSelected.empty()) return;
     pushSnapshot();
     for (int idx : multiSelected) {
-        if (idx >= 0 && idx < static_cast<int>(cubes.size())) {
-            cubes[idx].color = color;
+        if (idx >= 0 && idx < static_cast<int>(objects.size())) {
+            objects[idx].setColor(color);
         }
     }
     activeColor = color;
@@ -857,3 +972,88 @@ void SceneEditor::applyColorToSelection(const glm::vec3& color) {
             " cube(s)");
 
 }
+
+bool SceneEditor::getDiagonalSlicePreviewLine(glm::vec3& outA, glm::vec3& outB) const {
+    if (selected < 0 || selected >= static_cast<int>(objects.size())) return false;
+    if (sliceMode == SliceMode::Axis) return false;
+    
+    const AABB box = objects[selected].boundingAABB();
+    
+    // draw the diagonal line across the relevant face based on cutCorner
+    if (sliceMode == SliceMode::DiagonalXZ) {
+        float y = (box.min.y + box.max.y) * 0.5f;
+        switch (diagonalCutCorner % 2) {
+            case 0:
+                outA = glm::vec3(box.min.x, y, box.max.z);
+                outB = glm::vec3(box.max.x, y, box.min.z);
+                break;
+            default:
+                outA = glm::vec3(box.min.x, y, box.min.z);
+                outB = glm::vec3(box.max.z, y, box.max.z);
+                break;
+        }
+    } else if (sliceMode == SliceMode::DiagonalXY) {
+        float z = (box.min.z + box.max.z) * 0.5f;
+        switch (diagonalCutCorner % 2) {
+            case 0:
+                outA = glm::vec3(box.min.x, box.max.y, z);
+                outB = glm::vec3(box.max.x, box.min.y, z);
+                break;
+            default:
+                outA = glm::vec3(box.min.x, box.min.y, z);
+                outB = glm::vec3(box.max.x, box.max.y, z);
+                break;
+        }
+    } else { // DiagonalYZ
+        float x = (box.min.x + box.max.x) * 0.5f;
+        switch (diagonalCutCorner % 2) {
+            case 0:
+                outA = glm::vec3(x, box.max.y, box.min.z);
+                outB = glm::vec3(x, box.min.y, box.max.z);
+                break;
+            default:
+                outA = glm::vec3(x, box.min.y, box.min.z);
+                outB = glm::vec3(x, box.max.y, box.max.z);
+                break;
+        }
+    }
+    return true;
+}
+
+void SceneEditor::applyDiagonalSlice() {
+    if (selected < 0 || selected >= static_cast<int>(objects.size())) return;
+    if (sliceMode == SliceMode::Axis) return;
+    
+    const AABB sourceBox = objects[selected].boundingAABB();
+    glm::vec3 color = objects[selected].color();
+    
+    TriangularPrism prismA, prismB;
+    
+    if (sliceMode == SliceMode::DiagonalXZ) {
+        prismA = TriangularPrism::fromAABBDiagonalXZ(sourceBox, diagonalCutCorner, color);
+        prismB = TriangularPrism::fromAABBDiagonalXZ(sourceBox, (diagonalCutCorner + 2) % 4, color);
+    } else if (sliceMode == SliceMode::DiagonalXY) {
+        prismA = TriangularPrism::fromAABBDiagonalXY(sourceBox, diagonalCutCorner, color);
+        prismB = TriangularPrism::fromAABBDiagonalXY(sourceBox, (diagonalCutCorner + 2) % 4, color);
+    } else {
+        prismA = TriangularPrism::fromAABBDiagonalYZ(sourceBox, diagonalCutCorner, color);
+        prismB = TriangularPrism::fromAABBDiagonalYZ(sourceBox, (diagonalCutCorner + 2) % 4, color);
+    }
+    
+    pushSnapshot();
+    int oldSelected = selected;
+    objects.push_back(SceneObject::fromPrism(prismA));
+    objects.push_back(SceneObject::fromPrism(prismB));
+    eraseAndRemap(oldSelected);
+    
+    Log::info("Diagonal slice applied — " +
+              std::string(sliceMode == SliceMode::DiagonalXZ ? "XZ" :
+                          sliceMode == SliceMode::DiagonalXY ? "XY" : "YZ") +
+              " corner " + std::to_string(diagonalCutCorner));
+    
+    sliceMode = SliceMode::Axis;
+    sliceActive = false;
+    sliceAxis = -1;
+    tool = Tool::Select;
+}
+

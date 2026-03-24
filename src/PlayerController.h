@@ -3,6 +3,7 @@
 #include "PhysicsBody.h"
 #include "PhysicsSolver.h"
 #include "InputManager.h"
+#include "SceneObject.h"
 #include "Camera.h"
 
 #include <glm/glm.hpp>
@@ -27,7 +28,7 @@ public:
     // call once per frame in play mode.
     void update(    const InputManager& input,
                     PhysicsSolver& solver,
-                    const std::vector<AABB>& world,
+                    const std::vector<SceneObject>& world,
                     float deltaSeconds);
     // feeds the play camera
     glm::vec3 eyePosition() const;
