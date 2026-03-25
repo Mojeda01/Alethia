@@ -751,9 +751,12 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
     std::string header;
     std::getline(file, header);
 
-    bool isV2 = header.find("alethia v2") != std::string::npos;
+    
     bool isV1 = header.find("alethia v1") != std::string::npos;
-    if (!isV1 && !isV2) {
+    bool isV2 = header.find("alethia v2") != std::string::npos;
+    bool isV3 = header.find("alethia v3") != std::string::npos;
+
+    if (!isV1 && !isV2 && isV3) {
         Log::error("Invalid file format: " + filename);
         return false;
     }
@@ -767,8 +770,7 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
     }
 
     std::vector<SceneObject> loaded;
-    float minX, minY, minZ, maxX, maxY, maxZ, r, g, b;
-    bool isV3 = header.find("alethia v3") != std::string::npos;
+    float minX, minY, minZ, maxX, maxY, maxZ, r, g, b; 
     
     if (isV3) {
         std::string tag;
