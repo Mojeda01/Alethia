@@ -96,6 +96,13 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                 device.graphicsQueue(),
                 swapchainBundle.renderPass(),
                 static_cast<uint32_t>(swapchainBundle.framebuffers().size()))
+    , sceneRenderer(
+                    device.get(), device.physical(),
+                    commandPool.get(), device.graphicsQueue(),
+                    swapchainBundle, uniformBuffer,
+                    triangle, grid, lineRenderer,
+                    gizmo, cubeMesh, gridMesh, gizmoMesh,
+                    lineBatch, imgui)
 {
     auto now = std::chrono::steady_clock::now();
     startTime = now;
@@ -214,7 +221,7 @@ void VulkanApp::run() {
         if (appMode == AppMode::Edit) {
             editor.update(input, camera, window.get());
             if (editor.sceneVersion() != lastSceneVersion) {
-                prismCacheDirty = true;
+                sceneRenderer.markDirty();
                 lastSceneVersion = editor.sceneVersion();
             }
         } else {
@@ -268,27 +275,6 @@ glm::vec3 VulkanApp::raycastGrid(double mouseX, double mouseY) const {
         return glm::vec3(0.0f, -10000.0f, 0.0f);
     }
     return rayOrigin + rayDir * t;
-}
-
-void VulkanApp::rebuildPrismCache() {
-    prismCache.clear();
-    const auto& objs = editor.getObjects();
-    for (const auto& obj : objs) {
-        if (obj.type == ShapeType::Prism) {
-            PrismGeometry geo = makePrismMesh(obj.prism);
-            if (!geo.vertices.empty()) {
-                prismCache.push_back(std::make_unique<MeshBuffer>(
-                    device.get(), device.physical(),
-                    commandPool.get(), device.graphicsQueue(),
-                    geo.vertices, geo.indices));
-            } else {
-                prismCache.push_back(nullptr);
-            }
-        } else {
-            prismCache.push_back(nullptr);
-        }
-    }
-    prismCacheDirty = false;
 }
 
 void VulkanApp::drawFrame(){
@@ -375,12 +361,16 @@ void VulkanApp::drawFrame(){
     pushConstants.frameIndex = frameIndex++;
     Log::setFrame(frameIndex);
     
-    if (prismCacheDirty) {
-        vkDeviceWaitIdle(device.get());
-        rebuildPrismCache();
-    }
-    
-    recordCommandBuffer(cmd, imageIndex, pushConstants, activeCamera);
+    sceneRenderer.rebuildPrismCacheIfNeeded(editor.getObjects());
+    SceneRenderer::DrawContext ctx{
+        imageIndex,
+        activeCamera,
+        pushConstants,
+        editor,
+        wireframe,
+        lightPos
+    };
+    sceneRenderer.record(cmd, ctx);
 
     // submit
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -419,321 +409,6 @@ void VulkanApp::drawFrame(){
     }
 
     sync.advanceFrame();
-}
-
-void VulkanApp::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
-                            const TriangleRenderer::PushConstants& pushConstants,
-                            const Camera& activeCamera) {
-    VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    if (vkBeginCommandBuffer(cmd, &bi) != VK_SUCCESS) {
-        throw std::runtime_error("vkBeginCommandBuffer failed");
-    }
-
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { { 0.12f, 0.12f, 0.14f, 1.0f } };
-    clearValues[1].depthStencil = { 1.0f, 0 };
-
-    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    rp.renderPass = swapchainBundle.renderPass();
-    rp.framebuffer = swapchainBundle.framebuffers()[imageIndex];
-    rp.renderArea.offset = { 0, 0 };
-    rp.renderArea.extent = swapchainBundle.extent();
-    rp.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    rp.pClearValues = clearValues.data();
-
-    vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
-
-    VkViewport viewport{};
-    viewport.width = static_cast<float>(swapchainBundle.extent().width);
-    viewport.height = static_cast<float>(swapchainBundle.extent().height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.extent = swapchainBundle.extent();
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, grid.getPipeline());
-
-    VkDescriptorSet ds = uniformBuffer.descriptorSet(imageIndex);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, grid.getPipelineLayout(), 
-                            0, 1, &ds, 0, nullptr);
-
-    VkDeviceSize offset = 0;
-    VkBuffer gridVb = gridMesh.vertexBuffer();
-    vkCmdBindVertexBuffers(cmd, 0, 1, &gridVb, &offset);
-    vkCmdDraw(cmd, 6, 1, 0, 0);
-    
-    const auto& editorObjects = editor.getObjects();
-
-    if (editor.hasHighlight() && editor.activeTool() == SceneEditor::Tool::Place) { 
-        VkPipeline scenePipeline = triangle.getPipeline();
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
-
-        VkDescriptorSet sceneDs = uniformBuffer.descriptorSet(imageIndex);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
-                                    0, 1, &sceneDs, 0, nullptr);
-        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                                0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
-        VkDeviceSize cubeOffset = 0;
-        VkBuffer cubeVb = cubeMesh.vertexBuffer();
-        vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &cubeOffset);
-        VkBuffer cubeIb = cubeMesh.indexBuffer();
-        vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
-
-        glm::vec3 hlMin = editor.highlightMin();
-        glm::vec3 hlMax = editor.highlightMax();
-        glm::vec3 hlCenter = (hlMin + hlMax) * 0.5f;
-        glm::vec3 hlSize = hlMax - hlMin;
-        if (hlSize.y < 0.02f) hlSize.y = 0.02f;
-        
-        TriangleRenderer::PushConstants hlPc = pushConstants;
-        hlPc.color = glm::vec4(1.0f);
-        hlPc.model = glm::translate(glm::mat4(1.0f), hlCenter) *
-                        glm::scale(glm::mat4(1.0f), hlSize);
-        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                            0, sizeof(TriangleRenderer::PushConstants), &hlPc);
-        vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
-    }
-
-    if (editor.hasPreview() && editor.activeTool() == SceneEditor::Tool::Place) { 
-        VkPipeline scenePipeline = triangle.getPipeline();
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
-
-        VkDescriptorSet sceneDs = uniformBuffer.descriptorSet(imageIndex);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
-                                0, 1, &sceneDs, 0, nullptr);
-        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                             0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
-        VkDeviceSize cubeOffset = 0;
-        VkBuffer cubeVb = cubeMesh.vertexBuffer();
-        vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &cubeOffset);
-        VkBuffer cubeIb = cubeMesh.indexBuffer();
-        vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
-
-        AABB pv = editor.previewAABB();
-        glm::vec3 pvCenter = pv.center();
-        glm::vec3 pvSize = pv.size();
-        
-        TriangleRenderer::PushConstants pvPc = pushConstants;
-        pvPc.color = glm::vec4(1.0f);
-        pvPc.model = glm::translate(glm::mat4(1.0f), pvCenter) *
-                        glm::scale(glm::mat4(1.0f), pvSize);
-        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                            0, sizeof(TriangleRenderer::PushConstants), &pvPc);
-
-        vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
-    }
-
-    // Draw Cubes
-    if (!editorObjects.empty()) {
-        VkPipeline scenePipeline = wireframe ? triangle.getWireframePipeline() : triangle.getPipeline();
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scenePipeline);
-
-        VkDescriptorSet sceneDs = uniformBuffer.descriptorSet(imageIndex);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triangle.getPipelineLayout(),
-                                    0, 1, &sceneDs, 0, nullptr);
-
-        vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                            0, sizeof(TriangleRenderer::PushConstants), &pushConstants);
-
-        VkDeviceSize cubeOffset = 0;
-        VkBuffer cubeVb = cubeMesh.vertexBuffer();
-        vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &cubeOffset);
-        VkBuffer cubeIb = cubeMesh.indexBuffer();
-        vkCmdBindIndexBuffer(cmd, cubeIb, 0, VK_INDEX_TYPE_UINT32);
-
-        
-        for (int objIdx = 0; objIdx < static_cast<int>(editorObjects.size()); ++objIdx) {
-            const auto& obj = editorObjects[objIdx];
-            TriangleRenderer::PushConstants objPc = pushConstants;
-            objPc.color = glm::vec4(obj.color(), 1.0f);
-            
-            if (obj.type == ShapeType::Box) {
-                glm::vec3 center = obj.box.center();
-                glm::vec3 sz     = obj.box.size();
-                objPc.model = glm::translate(glm::mat4(1.0f), center) * glm::scale(glm::mat4(1.0f), sz);
-                vkCmdPushConstants(cmd, triangle.getPipelineLayout(),
-                                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                                   0, sizeof(TriangleRenderer::PushConstants), &objPc);
-                vkCmdDrawIndexed(cmd, cubeMesh.indexCount(), 1, 0, 0, 0);
-            } else {
-                int ci = objIdx < static_cast<int>(prismCache.size()) ? objIdx : -1;
-                if (ci >= 0 && prismCache[ci] != nullptr) {
-                    objPc.model = glm::mat4(1.0f);
-                    vkCmdPushConstants(cmd, triangle.getPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(TriangleRenderer::PushConstants), &objPc);
-                    VkBuffer prismVb = prismCache[ci]->vertexBuffer();
-                    VkDeviceSize prismOffset = 0;
-                    vkCmdBindVertexBuffers(cmd, 0, 1, &prismVb, &prismOffset);
-                    vkCmdBindIndexBuffer(cmd, prismCache[ci]->indexBuffer(),
-                                         0, VK_INDEX_TYPE_UINT32);
-                    vkCmdDrawIndexed(cmd, prismCache[ci]->indexCount(), 1, 0, 0, 0);
-                    // rebind cube mesh for subsequent box draws
-                    VkBuffer cubeVb = cubeMesh.vertexBuffer();
-                    vkCmdBindVertexBuffers(cmd, 0, 1, &cubeVb, &prismOffset);
-                    vkCmdBindIndexBuffer(cmd, cubeMesh.indexBuffer(),
-                                         0, VK_INDEX_TYPE_UINT32);
-                }
-                
-              }
-        }
-    }
-
-    // Draw selection lines
-    {
-        lineBatch.clear();        
-        // draw outline for every cube in multiSelected
-        const auto& multiSel = editor.selectedSet();
-        glm::vec3 red(1.0f, 0.3f, 0.3f);
-        glm::vec3 green(0.3f, 1.0f, 0.3f);
-        glm::vec3 blue(0.3f, 0.3f, 1.0f);
-        glm::vec3 yellow(1.0f, 1.0f, 0.2f);
-
-        for (int idx : multiSel) {
-            if (idx >= 0 && idx < static_cast<int>(editorObjects.size())) {
-                AABB box = editorObjects[idx].boundingAABB();
-                lineBatch.addAABBEdges(box.min, box.max, red, green, blue);
-            }
-        }
-
-        // slice plane visualization — only relevant for the single active selected cube
-        int sel = editor.selectedIndex();
-        if (sel >= 0 && sel < static_cast<int>(editorObjects.size())) {
-            const AABB box = editorObjects[sel].boundingAABB();
-            if (editor.isSlicing()) {
-                int ax = editor.getSliceAxis();
-                float sp = editor.getSlicePosition(); 
-                glm::vec3 c0 = box.min;
-                glm::vec3 c1 = box.min;
-                glm::vec3 c2 = box.max;
-                glm::vec3 c3 = box.max;
-
-                c0[ax] = sp; c1[ax] = sp; c2[ax] = sp; c3[ax] = sp;
-
-                if (ax == 0) {
-                    c1.y = box.max.y;
-                    c3.z = box.min.z;
-                    lineBatch.addLine(c0, c1, yellow);
-                    lineBatch.addLine(c1, c2, yellow);
-                    lineBatch.addLine(c2, c3, yellow);
-                    lineBatch.addLine(c3, c0, yellow);
-                } else if (ax == 1) {
-                    c1.x = box.max.x;
-                    c3.z = box.min.z;
-                    lineBatch.addLine(c0, c1, yellow);
-                    lineBatch.addLine(c1, c2, yellow);
-                    lineBatch.addLine(c2, c3, yellow);
-                    lineBatch.addLine(c3, c0, yellow);
-                } else {
-                    c1.x = box.max.x;
-                    c3.y = box.min.y;
-                    lineBatch.addLine(c0, c1, yellow);
-                    lineBatch.addLine(c1, c2, yellow);
-                    lineBatch.addLine(c2, c3, yellow);
-                    lineBatch.addLine(c3, c0, yellow);
-                }
-            }
-            
-            if (editor.isDiagonalSliceReady()) {
-                glm::vec3 lineA, lineB;
-                if (editor.getDiagonalSlicePreviewLine(lineA, lineB)) {
-                    glm::vec3 orange(1.0f, 0.5f, 0.0f);
-                    lineBatch.addLine(lineA, lineB, orange);
-                }
-            }
-        }
-        
-        // draw paste preview cubes as wireframe outlines
-        if (editor.isPasting()) {
-            for (const SceneObject& pv : editor.pastePreviewCubes()) {
-                glm::vec3 cyan(0.2f, 1.0f, 1.0f);
-                AABB bound = pv.boundingAABB();
-                lineBatch.addAABBEdges(bound.min, bound.max, cyan, cyan, cyan);
-            }
-        }
-
-        lineBatch.upload();
-
-        if (!lineBatch.empty()) {
-            UniformBuffer::MVPData lineMvp{}; 
-            lineMvp.view = activeCamera.viewMatrix(); 
-            lineMvp.projection = activeCamera.projectionMatrix();
-            lineMvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f); 
-            lineMvp.viewPos = glm::vec4(activeCamera.position(), 1.0f);
-            uniformBuffer.update(imageIndex, lineMvp);
-
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lineRenderer.getPipeline());
-            VkDescriptorSet lineDs = uniformBuffer.descriptorSet(imageIndex);
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lineRenderer.getPipelineLayout(),
-                                    0, 1, &lineDs, 0, nullptr);
-            VkDeviceSize lineOffset = 0;
-            VkBuffer lineBuf = lineBatch.buffer();
-            vkCmdBindVertexBuffers(cmd, 0, 1, &lineBuf, &lineOffset);
-            vkCmdDraw(cmd, lineBatch.vertexCount(), 1, 0, 0);
-        }
-    }
-    
-    // Gizmo code
-    {
-        VkExtent2D ext = swapchainBundle.extent();
-        const uint32_t GIZMO_SIZE = 120;
-
-        VkViewport gizmoViewport{};
-        gizmoViewport.x      = static_cast<float>(ext.width - GIZMO_SIZE);
-        gizmoViewport.y      = 0.0f;
-        gizmoViewport.width  = static_cast<float>(GIZMO_SIZE);
-        gizmoViewport.height = static_cast<float>(GIZMO_SIZE);
-        gizmoViewport.minDepth = 0.0f;
-        gizmoViewport.maxDepth = 1.0f;
-        vkCmdSetViewport(cmd, 0, 1, &gizmoViewport);
-
-        VkRect2D gizmoScissor{};
-        gizmoScissor.offset = { static_cast<int32_t>(ext.width - GIZMO_SIZE), 0 };
-        gizmoScissor.extent = { GIZMO_SIZE, GIZMO_SIZE };
-        vkCmdSetScissor(cmd, 0, 1, &gizmoScissor); 
-        
-        glm::mat4 rotOnlyView = glm::mat4(glm::mat3(activeCamera.viewMatrix())); 
-        rotOnlyView[3][2] = -2.0f;
-        glm::mat4 gizmoProj = glm::ortho(-1.2f, 1.2f, 1.2f, -1.2f, 0.1f, 10.0f);
-
-        GizmoRenderer::PushConstants pc{};
-        pc.view       = rotOnlyView;
-        pc.projection = gizmoProj;
-
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gizmo.getPipeline());
-        vkCmdPushConstants(cmd, gizmo.getPipelineLayout(),
-                            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GizmoRenderer::PushConstants), &pc);
-
-        VkBuffer gizmoVb = gizmoMesh.vertexBuffer();
-        vkCmdBindVertexBuffers(cmd, 0, 1, &gizmoVb, &offset);
-        VkBuffer gizmoIb = gizmoMesh.indexBuffer();
-        vkCmdBindIndexBuffer(cmd, gizmoIb, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(cmd, gizmoMesh.indexCount(), 1, 0, 0, 0);
-        
-        VkViewport fullViewport{};
-        fullViewport.width    = static_cast<float>(ext.width);
-        fullViewport.height   = static_cast<float>(ext.height);
-        fullViewport.minDepth = 0.0f;
-        fullViewport.maxDepth = 1.0f;
-        vkCmdSetViewport(cmd, 0, 1, &fullViewport);
-
-        VkRect2D fullScissor{};
-        fullScissor.extent = ext;
-        vkCmdSetScissor(cmd, 0, 1, &fullScissor);
-    }
-
-    imgui.render(cmd);
-    vkCmdEndRenderPass(cmd);
-
-    if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
-        throw std::runtime_error("vkEndCommandBuffer failed");
-    }
 }
 
 void VulkanApp::recreateSwapchain() {

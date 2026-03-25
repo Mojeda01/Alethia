@@ -31,12 +31,11 @@
 #include "PlayerController.h"
 #include "PhysicsSolver.h"
 #include "MaterialPanel.h"
+#include "SceneRenderer.h"
 
 #include <chrono>
 #include <cstdint>
 #include <vector>
-#include <optional>
-#include <memory>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -55,12 +54,9 @@ public:
 private:
     void cleanup();
     void drawFrame();
-    void recordCommandBuffer(   VkCommandBuffer cmd, uint32_t imageIndex,
-                                const TriangleRenderer::PushConstants& pushConstants,
-                                const Camera& activeCamera);
+ 
     void recreateSwapchain(); 
     glm::vec3 raycastGrid(double mouseX, double mouseY) const;
-    void rebuildPrismCache();
 private:
     Window window;
     InputManager input;
@@ -77,8 +73,6 @@ private:
     GizmoRenderer gizmo;
     MeshBuffer gizmoMesh;
     MeshBuffer cubeMesh;
-    std::vector<std::unique_ptr<MeshBuffer>> prismCache;
-    bool prismCacheDirty = true;
     DevTexture devTexture;
     LineBatch lineBatch;
     SceneEditor editor; 
@@ -87,6 +81,7 @@ private:
     ImGuiLayer imgui;
     DebugUI debugUI;
     MaterialPanel materialPanel;
+    SceneRenderer sceneRenderer;
     float lightPos[3] = { 5.0f, 10.0f, 5.0f };
     char sceneFilename[256] = "scene.alethia";
     bool wireframe = false;

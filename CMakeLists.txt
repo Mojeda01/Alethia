@@ -141,6 +141,7 @@ add_executable(VulkanLab
     src/ColorPalette.cpp
     src/MaterialPanel.cpp
     src/TriangularPrismMesh.cpp
+    src/SceneRenderer.cpp
     src/external/imgui/imgui.cpp
     src/external/imgui/imgui_draw.cpp
     src/external/imgui/imgui_tables.cpp
