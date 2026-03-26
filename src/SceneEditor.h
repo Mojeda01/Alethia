@@ -128,6 +128,8 @@ private:
     AABB preview{};
 
     float placementY = 0.0f;
+    float placementHeight = 1.0f;
+    float scrollAccum = 0.0f;
     int surfaceHitCube = -1;
 
     int dragFace = -1;

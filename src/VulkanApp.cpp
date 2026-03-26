@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
 #include <stdexcept>
@@ -114,7 +115,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     Log::info("Alethia engine initialized");
 
     debugUI.addPanel("General", [this]() {
-        ImGui::InputText("File", sceneFilename, sizeof(sceneFilename));
+        ImGui::InputText("File", sceneFilename.data(), sceneFilename.capacity() + 1); 
         if (ImGui::Button("New")) {
             editor.newProject();
         }
@@ -124,7 +125,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
         }
         ImGui::SameLine();
         if (ImGui::Button("Load")) {
-            editor.loadFromFile(std::string(sceneFilename));
+            editor.loadFromFile(sceneFilename); 
         }
         if (ImGui::Button("Quit")) {
             glfwSetWindowShouldClose(window.get(), GLFW_TRUE); 
@@ -138,7 +139,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
         ImGui::Text("FPS: %.0f", avg > 0.0f ? 1000.0f / avg : 0.0f);
         ImGui::Text("Frame: %u", frameIndex);
         ImGui::Text("Frame time: %.2f ms", avg);
-        ImGui::PlotLines("##frametime", frameTimes, FRAME_TIME_COUNT,
+        ImGui::PlotLines("##frametime", frameTimes.data(), FRAME_TIME_COUNT,
                             frameTimeIndex, nullptr, 0.0f, 2.0f, ImVec2(0, 40));
 
     });
@@ -168,9 +169,9 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     });
 
     debugUI.addPanel("Lighting", [this]() {
-        ImGui::SliderFloat("Light X", &lightPos[0], -50.0f, 50.0f);
-        ImGui::SliderFloat("Light Y", &lightPos[1], 0.0f, 50.0f);
-        ImGui::SliderFloat("Light Z", &lightPos[2], -50.0f, 50.0f);
+        ImGui::SliderFloat("Light X", &lightPos.x, -50.0f, 50.0f);
+        ImGui::SliderFloat("Light Y", &lightPos.y, 0.0f, 50.0f);
+        ImGui::SliderFloat("Light Z", &lightPos.z, -50.0f, 50.0f);
     });
 
     debugUI.addPanel("Render", [this]() {
@@ -351,7 +352,7 @@ void VulkanApp::drawFrame(){
     UniformBuffer::MVPData mvp{};
     mvp.view = activeCamera.viewMatrix(); 
     mvp.projection = activeCamera.projectionMatrix(); 
-    mvp.lightPos = glm::vec4(lightPos[0], lightPos[1], lightPos[2], 1.0f); 
+    mvp.lightPos = glm::vec4(lightPos, 1.0f); // // glm::vec3 converts cleanly to vec4 
     mvp.viewPos = glm::vec4(activeCamera.position(), 1.0f); 
     uniformBuffer.update(imageIndex, mvp);
 
@@ -368,7 +369,7 @@ void VulkanApp::drawFrame(){
         pushConstants,
         editor,
         wireframe,
-        lightPos
+        glm::value_ptr(lightPos) // converts glm::vec3 to const float*
     };
     sceneRenderer.record(cmd, ctx);
 

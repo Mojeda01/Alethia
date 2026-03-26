@@ -127,6 +127,19 @@ void InputManager::mouseButtonCallback(GLFWwindow* window, int button, int actio
     }
 }
 
+void InputManager::scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    std::cout << "MY scroll callback fired: " << yoffset << "\n";
+    (void)xoffset;
+    auto* input = reinterpret_cast<InputManager*>(glfwGetWindowUserPointer(window));
+    if (!input) return;
+    input->scrollY += yoffset;
+    std::cout << "scroll: " << yoffset << "\n";
+    if (input->uiMode) {
+        ImGui::GetIO().AddMouseWheelEvent(0.0f, static_cast<float>(yoffset));
+    }
+}
+
 void InputManager::framebufferResizeCallback(GLFWwindow* window, int width, int height)
 {
     (void)width;
@@ -188,7 +201,10 @@ void InputManager::charCallback(GLFWwindow* window, unsigned int codepoint) {
 void InputManager::installCallbacks() {
     glfwSetCursorPosCallback(window, InputManager::cursorPosCallback);
     glfwSetMouseButtonCallback(window, InputManager::mouseButtonCallback);
+    glfwSetScrollCallback(window, InputManager::scrollCallback);
     glfwSetKeyCallback(window, InputManager::keyCallback);
+    std::cout << "scroll callback installed: " << (void*)InputManager::scrollCallback << "\n";
     glfwSetCharCallback(window, InputManager::charCallback);
     glfwSetFramebufferSizeCallback(window, InputManager::framebufferResizeCallback);
 }
+

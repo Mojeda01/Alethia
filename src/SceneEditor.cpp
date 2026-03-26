@@ -234,10 +234,10 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
     highlightValid = false;
 
     if (!input.inUIMode()) return;
-    if (input.imguiWantsMouse()) return;
+    if (input.imguiWantsMouse() && !dragging) return;
 
     glm::vec3 hit = raycastGrid(input, camera, window);
-    if (hit.y < -9999.0f) return;
+    if (hit.y < -9999.0f && !dragging) return;
 
     float snappedX = snapValue(hit.x);
     float snappedZ = snapValue(hit.z);
@@ -253,6 +253,12 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
         if (!dragging){
             // hovering - show context-aware highlighting
             highlightValid = true;
+            
+            double sv = input.scrollDelta();
+            Log::info("scroll read: " + std::to_string(sv) +
+                      " accum: " + std::to_string(scrollAccum) +
+                      " height: " + std::to_string(placementHeight));
+            scrollAccum += static_cast<float>(input.scrollDelta());
 
             if (surfaceHitCube >= 0) {
                 // hovering over a cube top face — highlight the entire top face
@@ -285,9 +291,22 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
             if (maxX - minX < gridSnap * 0.5f) maxX = minX + gridSnap;  
             if (maxZ - minZ < gridSnap * 0.5f) maxZ = minZ + gridSnap;
             
+            // accumulate scroll and step height in gridSnap increments
+            scrollAccum += static_cast<float>(input.scrollDelta());
+            const float scrollThreshold = 0.5f;
+            while (scrollAccum >= scrollThreshold) {
+                placementHeight += gridSnap;
+                scrollAccum -= scrollThreshold;
+            }
+            while (scrollAccum <= -scrollThreshold) {
+                placementHeight -= gridSnap;
+                if (placementHeight < gridSnap) placementHeight = gridSnap;
+                scrollAccum += scrollThreshold;
+            }
+            
             // preview is exactly what you see — no extra gridSnap added
             preview.min = glm::vec3(minX, placementY, minZ);
-            preview.max = glm::vec3(maxX, placementY + gridSnap, maxZ);  
+            preview.max = glm::vec3(maxX, placementY + placementHeight, maxZ);
 
             if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) { 
                 objects.push_back(SceneObject::fromBox(preview));
@@ -304,6 +323,8 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                             std::to_string(preview.max.z) + ")");
                 dragging = false;
                 surfaceHitCube = -1;
+                placementHeight = gridSnap;
+                scrollAccum = 0.0f;
             }
         }
     } 
@@ -666,6 +687,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
     if (!input.imguiWantsKeyboard() && input.wasKeyJustPressed(GLFW_KEY_1)) { 
         tool = Tool::Place;
         selected = -1;
+        placementHeight = gridSnap;
         Log::info("Tool: Place");
     }
     if (!input.imguiWantsKeyboard() && input.wasKeyJustPressed(GLFW_KEY_2)) { 
@@ -756,7 +778,7 @@ bool SceneEditor::loadFromFile(const std::string& filename) {
     bool isV2 = header.find("alethia v2") != std::string::npos;
     bool isV3 = header.find("alethia v3") != std::string::npos;
 
-    if (!isV1 && !isV2 && isV3) {
+    if (!isV1 && !isV2 && !isV3) {
         Log::error("Invalid file format: " + filename);
         return false;
     }

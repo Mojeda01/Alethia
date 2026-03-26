@@ -20,6 +20,7 @@ public:
     double mouseY() const { return cursorY; }
     double mouseDeltaX() const { return deltaX; }
     double mouseDeltaY() const { return deltaY; }
+    double scrollDelta() const { double v = scrollY; scrollY = 0.0; return v; }
     bool inUIMode() const { return uiMode; }
     void setUIMode(bool mode);
     bool imguiWantsMouse() const;
@@ -30,6 +31,7 @@ public:
 private:
     static void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
     static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void charCallback(GLFWwindow* window, unsigned int codepoint);
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
@@ -43,6 +45,7 @@ private:
     double lastCursorY = 0.0;
     double deltaX = 0.0;
     double deltaY = 0.0;
+    mutable double scrollY = 0.0;
     bool firstMouse = true;
 
     bool fbResized = false;
