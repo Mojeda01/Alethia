@@ -82,11 +82,11 @@ private:
     DebugUI debugUI;
     MaterialPanel materialPanel;
     SceneRenderer sceneRenderer;
-    float lightPos[3] = { 5.0f, 10.0f, 5.0f };
-    char sceneFilename[256] = "scene.alethia";
+    glm::vec3 lightPos { 5.0f, 10.0f, 5.0f };
+    std::string sceneFilename = "scene.alethia";
     bool wireframe = false;
     static constexpr int FRAME_TIME_COUNT = 120;
-    float frameTimes[FRAME_TIME_COUNT] = {};
+    std::array<float, FRAME_TIME_COUNT> frameTimes{}; 
     int frameTimeIndex = 0;
     std::chrono::steady_clock::time_point startTime;
     std::chrono::steady_clock::time_point lastFrameTime;

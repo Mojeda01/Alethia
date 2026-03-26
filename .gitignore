@@ -1,0 +1,14 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+
+# Generated files
+imgui.ini
+scene*.alethia
+*.exe
+
+# Temporary
+Research/
+old_builds/
