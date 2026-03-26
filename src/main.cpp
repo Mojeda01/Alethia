@@ -4,7 +4,7 @@
 
 int main() {
     try {
-        VulkanApp app(2560, 1440, "VulkanLab");
+        VulkanApp app(2560, 1440, "Alethia Game Engine");
         app.run();
     } catch (const std::exception& e) {
         std::cerr << e.what() << "\n";
