@@ -143,6 +143,7 @@ add_executable(VulkanLab
     src/TriangularPrismMesh.cpp
     src/SceneRenderer.cpp
     src/ExternalTools.cpp 
+    src/SpatialIndex.cpp
     src/external/imgui/imgui.cpp
     src/external/imgui/imgui_draw.cpp
     src/external/imgui/imgui_tables.cpp

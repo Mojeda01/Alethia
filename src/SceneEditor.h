@@ -4,6 +4,7 @@
 #include "SceneObject.h"
 #include "TriangularPrism.h"
 #include "InputManager.h"
+#include "SpatialIndex.h"
 #include "Camera.h"
 
 #include <glm/glm.hpp>
@@ -150,5 +151,8 @@ private:
     // paste preview
     bool pasting = false;
     std::vector<SceneObject> pastePreview;
+    
+    mutable SpatialIndex spatialIndex{1.0f};
+    mutable bool spatialDirty = true;
     
 };

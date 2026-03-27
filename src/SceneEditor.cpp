@@ -1,4 +1,5 @@
 #include "SceneEditor.h"
+#include "SpatialIndex.h"
 #include "Log.h"
 
 #include <imgui.h>
@@ -164,6 +165,7 @@ void SceneEditor::pushSnapshot() {
         history.pop_front();
         historyCursor = static_cast<int>(history.size()) - 1;
     }
+    spatialDirty = true;
 }
 
 void SceneEditor::undo() {
@@ -213,10 +215,18 @@ void SceneEditor::buildPastePreview(float targetX, float targetY, float targetZ)
 
 int SceneEditor::hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const 
 {
+    if (spatialDirty) {
+        spatialIndex.rebuild(objects);
+        spatialDirty = false;
+    }
+    
     float closestT = 1e30f;
-    int hitIndex = -1;
-
-    for (int i = 0; i < static_cast<int>(objects.size()); ++i){
+    float hitIndex = -1;
+    
+    glm::vec3 testPoint = rayOrigin + rayDir * 10.0f;
+    auto candidates = spatialIndex.queryPoint(testPoint);
+    
+    for (int i : candidates) {
         float t = 0.0f;
         int face = hitTestCube(rayOrigin, rayDir, i, t);
         if (face == 2 && t < closestT) {
@@ -224,6 +234,7 @@ int SceneEditor::hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& ray
             hitIndex = i;
         }
     }
+    
     if (hitIndex >= 0) {
         outY = objects[hitIndex].boundingAABB().max.y;
     }
@@ -397,7 +408,22 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                 // find closest hit 
                 float closestT = 1e30f;
                 int hitIndex = -1;
-                for (int i = 0; i < static_cast<int>(objects.size()); ++i) {
+                
+                if (spatialDirty) {
+                    spatialIndex.rebuild(objects);
+                    spatialDirty = false;
+                }
+                
+                glm::vec3 testPoint = rayOrigin + rayDir * 50.0f;
+                auto candidates = spatialIndex.queryPoint(testPoint);
+                auto candidates2 = spatialIndex.queryPoint(rayOrigin);
+                for (int i : candidates2) {
+                    if (std::find(candidates.begin(), candidates.end(), i) == candidates.end()) {
+                        candidates.push_back(i);
+                    }
+                }
+                
+                for (int i : candidates) {
                     float t = 0.0f;
                     int face = hitTestCube(rayOrigin, rayDir, i, t);
                     if (face >= 0 && t < closestT) {
@@ -405,6 +431,7 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                         hitIndex = i;
                     }
                 }
+                
                 bool shiftHeld = input.isKeyPressed(GLFW_KEY_LEFT_SHIFT) ||
                                     input.isKeyPressed(GLFW_KEY_RIGHT_SHIFT);
 
