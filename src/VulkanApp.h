@@ -32,6 +32,7 @@
 #include "PhysicsSolver.h"
 #include "MaterialPanel.h"
 #include "SceneRenderer.h"
+#include "ExternalTools.h"
 
 #include <chrono>
 #include <cstdint>
@@ -82,6 +83,7 @@ private:
     DebugUI debugUI;
     MaterialPanel materialPanel;
     SceneRenderer sceneRenderer;
+    ExternalTools externalTools;
     glm::vec3 lightPos { 5.0f, 10.0f, 5.0f };
     std::string sceneFilename = "scene.alethia";
     bool wireframe = false;

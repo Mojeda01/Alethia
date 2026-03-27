@@ -113,7 +113,15 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
 
     Log::init(500);
     Log::info("Alethia engine initialized");
-
+    
+    // The External tool execution panels.
+    externalTools.addPanel("Test Tool", [this]() {
+        if (ImGui::Button("Run TestBinaryTool")) {
+            externalTools.testExecution();
+        }
+    });
+    
+    // The debug panel section
     debugUI.addPanel("General", [this]() {
         ImGui::InputText("File", sceneFilename.data(), sceneFilename.capacity() + 1); 
         if (ImGui::Button("New")) {
@@ -337,6 +345,7 @@ void VulkanApp::drawFrame(){
 
     imgui.newFrame();
     debugUI.draw();
+    externalTools.draw();
     materialPanel.draw();
 
     if (materialPanel.colorWasJustSelected() && appMode == AppMode::Edit) {
