@@ -93,8 +93,26 @@ add_custom_command(
     VERBATIM
 )
 
+set(MESH_VERT_SPV ${SHADER_BIN_DIR}/mesh.vert.spv)
+set(MESH_FRAG_SPV ${SHADER_BIN_DIR}/mesh.frag.spv)
+
+add_custom_command(
+    OUTPUT ${MESH_VERT_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/mesh.vert -o ${MESH_VERT_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/mesh.vert
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${MESH_FRAG_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS} ${SHADER_SRC_DIR}/mesh.frag -o ${MESH_FRAG_SPV}
+    DEPENDS ${SHADER_SRC_DIR}/mesh.frag
+    VERBATIM
+)
+
 add_custom_target(
-    VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV} ${GRID_VERT_SPV} ${GRID_FRAG_SPV} ${GIZMO_VERT_SPV} ${GIZMO_FRAG_SPV} ${LINE_VERT_SPV} ${LINE_FRAG_SPV})
+    VulkanLabShaders DEPENDS ${TRI_VERT_SPV} ${TRI_FRAG_SPV} ${GRID_VERT_SPV} ${GRID_FRAG_SPV} ${GIZMO_VERT_SPV} ${GIZMO_FRAG_SPV} ${LINE_VERT_SPV} ${LINE_FRAG_SPV}
+        ${MESH_VERT_SPV} ${MESH_FRAG_SPV})
 
 add_library(VulkanTriangle STATIC
     src/triangle/TriangleRenderer.cpp
@@ -144,6 +162,9 @@ add_executable(VulkanLab
     src/SceneRenderer.cpp
     src/ExternalTools.cpp 
     src/SpatialIndex.cpp
+    src/MeshRenderer.cpp
+    src/Mesh.h
+    src/MeshInstance.h
     src/external/imgui/imgui.cpp
     src/external/imgui/imgui_draw.cpp
     src/external/imgui/imgui_tables.cpp
