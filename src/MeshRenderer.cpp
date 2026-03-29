@@ -22,7 +22,7 @@ MeshRenderer::MeshRenderer(Device& device,
     VkPipeline tmpPipeline = VK_NULL_HANDLE;
 
     try {
-        // Local shader file reader
+        std::string shaderDir = VULKANLAB_SHADER_DIR;
         auto readFile = [](const std::string& filename) -> std::vector<char> {
             std::ifstream file(filename, std::ios::ate | std::ios::binary);
             if (!file.is_open()) {
@@ -34,9 +34,9 @@ MeshRenderer::MeshRenderer(Device& device,
             file.read(buffer.data(), size);
             return buffer;
         };
-
-        auto vertCode = readFile("shaders/mesh.vert.spv");
-        auto fragCode = readFile("shaders/mesh.frag.spv");
+        
+        auto vertCode = readFile(shaderDir + "/mesh.vert.spv");
+        auto fragCode = readFile(shaderDir + "/mesh.frag.spv");
 
         // Create shader modules
         auto createShaderModule = [&](const std::vector<char>& code) -> VkShaderModule {

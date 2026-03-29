@@ -1,6 +1,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "external/tiny_obj_loader.h"
 #include "ObjLoader.h"
+#include "Mesh.h"
 
 #include <stdexcept>
 #include <unordered_map>
@@ -10,26 +11,25 @@
 #include <fstream>
 #include <map>
 
-namespace{
-struct VertexKey{
+namespace {
+struct VertexKey {
     int vi, ni, ti;
     bool operator==(const VertexKey& o) const {
         return vi == o.vi && ni == o.ni && ti == o.ti;
     }
 };
 
-
-struct VertexKeyHash{
+struct VertexKeyHash {
     size_t operator()(const VertexKey& k) const {
         size_t h = std::hash<int>()(k.vi);
         h ^= std::hash<int>()(k.ni) + 0x9e3779b9 + (h << 6) + (h >> 2);
         h ^= std::hash<int>()(k.ti) + 0x9e3779b9 + (h << 6) + (h >> 2);
         return h;
-    }    
+    }
 };
 } // namespace
 
-ObjMesh loadObj(const std::string& objPath) {
+Mesh loadObj(const std::string& objPath) {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -69,14 +69,8 @@ ObjMesh loadObj(const std::string& objPath) {
         std::cout << "  mat[" << i << "] name=" << materials[i].name
             << " diffuse_texname=" << materials[i].diffuse_texname << "\n";
     }
-
-    ObjMesh mesh;
-    mesh.textureBasePath = mtlDir;
-    for (const auto& mat : materials) {
-        if (!mat.diffuse_texname.empty()) {
-            mesh.materialTextures[mat.name] = mat.diffuse_texname;
-        }
-    }
+    
+    Mesh mesh;
         
     std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVerts;
 
