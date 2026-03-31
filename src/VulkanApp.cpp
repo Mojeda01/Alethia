@@ -59,6 +59,11 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
     , commandPool(  device.get(),
                     device.graphicsQueueFamily(),
                     swapchainBundle.framebuffers().size())
+    , meshRenderer(device,
+                   commandPool,
+                   device.graphicsQueue(),
+                   swapchainBundle.renderPass(),
+                   uniformBuffer.descriptorSetLayout())
     , gridMesh(     device.get(),
                     device.physical(),
                     commandPool.get(),
@@ -97,13 +102,14 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                 device.graphicsQueue(),
                 swapchainBundle.renderPass(),
                 static_cast<uint32_t>(swapchainBundle.framebuffers().size()))
+    , objModelMenu(meshRenderer)
     , sceneRenderer(
                     device.get(), device.physical(),
                     commandPool.get(), device.graphicsQueue(),
                     swapchainBundle, uniformBuffer,
                     triangle, grid, lineRenderer,
                     gizmo, cubeMesh, gridMesh, gizmoMesh,
-                    lineBatch, imgui)
+                    lineBatch, imgui, meshRenderer)
 {
     auto now = std::chrono::steady_clock::now();
     startTime = now;
@@ -347,6 +353,10 @@ void VulkanApp::drawFrame(){
     debugUI.draw();
     externalTools.draw();
     materialPanel.draw();
+    
+    if (objModelMenu.isVisible()) {
+        objModelMenu.draw();
+    }
 
     if (materialPanel.colorWasJustSelected() && appMode == AppMode::Edit) {
         editor.applyColorToSelection(materialPanel.selectedColor());

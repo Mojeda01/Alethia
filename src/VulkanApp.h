@@ -33,6 +33,7 @@
 #include "MaterialPanel.h"
 #include "SceneRenderer.h"
 #include "ExternalTools.h"
+#include "ObjModelMenu.h"
 
 #include <chrono>
 #include <cstdint>
@@ -71,6 +72,7 @@ private:
     LineRenderer lineRenderer;
     CommandPool commandPool;
     MeshBuffer gridMesh;
+    MeshRenderer meshRenderer;
     GizmoRenderer gizmo;
     MeshBuffer gizmoMesh;
     MeshBuffer cubeMesh;
@@ -82,6 +84,7 @@ private:
     ImGuiLayer imgui;
     DebugUI debugUI;
     MaterialPanel materialPanel;
+    ObjModelMenu objModelMenu;
     SceneRenderer sceneRenderer;
     ExternalTools externalTools;
     glm::vec3 lightPos { 5.0f, 10.0f, 5.0f };

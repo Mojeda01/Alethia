@@ -6,6 +6,7 @@
 #include "InputManager.h"
 #include "SpatialIndex.h"
 #include "Camera.h"
+#include "Mesh.h"
 
 #include <glm/glm.hpp>
 #include <vector>
@@ -39,6 +40,9 @@ public:
     bool loadFromFile(const std::string& filename);
 
     const std::vector<SceneObject>& getObjects() const { return objects; }
+    
+    // Add a loaded mesh to the scene so it is managed by SceneEditor
+    void addMesh(const Mesh& meshData, const glm::vec3& position = glm::vec3(0.0f, 2.0f, 0.0f));
     
     // backward-compatible helper - returns bounding  AABBs for physics.
     std::vector<AABB> getCollisionAABBs() const {
@@ -101,6 +105,8 @@ private:
     void eraseAndRemap(int index);
     int hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float& outY) const; 
 
+    SceneObject createMeshSceneObject(const Mesh& meshData, const glm::vec3& position);
+    
     std::deque<std::vector<SceneObject>> history;
     int historyCursor = -1;
     static constexpr int MAX_HISTORY = 64;
