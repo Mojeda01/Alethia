@@ -21,8 +21,10 @@ SceneRenderer::SceneRenderer(
     MeshBuffer&       gridMesh,
     MeshBuffer&       gizmoMesh,
     LineBatch&        lineBatch,
-    ImGuiLayer&       imgui)
+    ImGuiLayer&       imgui,
+    MeshRenderer& meshRenderer)
     : device(device)
+    , meshRenderer(meshRenderer)
     , physical(physical)
     , commandPool(commandPool)
     , graphicsQueue(graphicsQueue)
@@ -105,6 +107,9 @@ void SceneRenderer::record(VkCommandBuffer cmd, const DrawContext& ctx) {
     drawObjects(cmd, ctx);
     drawSelectionLines(cmd, ctx);
     drawGizmo(cmd, ctx);
+    
+    // render loaded obj models
+    meshRenderer.record(cmd, uniformBuffer, ctx.imageIndex);
     
     imgui.render(cmd);
     

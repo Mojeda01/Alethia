@@ -8,6 +8,7 @@
 #include <string>
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 
 float SceneEditor::snapValue(float val) const {
     return std::floor(val / gridSnap) * gridSnap;
@@ -152,20 +153,30 @@ void SceneEditor::eraseAndRemap(int index) {
 }
 
 void SceneEditor::pushSnapshot() {
-    ++sceneVer;
-    if (historyCursor < static_cast<int>(history.size()) - 1) {
-        history.erase(history.begin() + historyCursor + 1, history.end());
+    // Guard against invalid state
+    if (historyCursor < 0 || history.empty()) {
+        history.clear();
+        history.push_back(objects);
+        historyCursor = 0;
+        sceneVer++;
+        return;
     }
-     
+
+    // Trim any redo history beyond current cursor
+    while (history.size() > static_cast<size_t>(historyCursor + 1)) {
+        history.pop_back();
+    }
+
+    // Enforce max history size
+    if (history.size() >= MAX_HISTORY) {
+        history.pop_front();
+        if (historyCursor > 0) historyCursor--;
+    }
+
+    // Push a copy of current objects
     history.push_back(objects);
     historyCursor = static_cast<int>(history.size()) - 1;
-
-    // trim oldest if over limit 
-    if (static_cast<int>(history.size()) > MAX_HISTORY) {
-        history.pop_front();
-        historyCursor = static_cast<int>(history.size()) - 1;
-    }
-    spatialDirty = true;
+    sceneVer++;
 }
 
 void SceneEditor::undo() {
@@ -744,11 +755,14 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
 }
 
 void SceneEditor::newProject() {
-    history.clear();
-    historyCursor = -1;
     objects.clear();
     clearSelection();
-    pushSnapshot();
+        
+    history.clear();
+    history.push_back(objects);        // initial empty snapshot
+    historyCursor = 0;
+    sceneVer = 1;
+        
     sliceActive = false;
     sliceAxis = -1;
     moving = false;
@@ -757,6 +771,8 @@ void SceneEditor::newProject() {
     clipBoard.clear();
     pastePreview.clear();
     pasting = false;
+    spatialDirty = true;
+        
     Log::info("New project created");
 }
 
@@ -1108,3 +1124,46 @@ void SceneEditor::applyDiagonalSlice() {
     tool = Tool::Select;
 }
 
+void SceneEditor::addMesh(const Mesh& meshData, const glm::vec3& position)
+{
+    Log::info("addMesh called with " + std::to_string(meshData.vertices.size()) + " vertices");
+
+    if (meshData.vertices.empty()) {
+        Log::warn("Cannot add empty mesh to scene");
+        return;
+    }
+
+    try {
+        const size_t vertexCount = meshData.vertices.size();
+
+        Log::info("Creating proxy for large mesh (" + std::to_string(vertexCount) + " verts)");
+
+        // Direct in-place construction - no temporary SceneObject at all
+        objects.emplace_back();
+        SceneObject& obj = objects.back();
+
+        obj.type = ShapeType::Box;
+
+        // Generous fixed AABB (no vertex iteration, no copy issues)
+        obj.box.min = position - glm::vec3(50.0f, 50.0f, 50.0f);
+        obj.box.max = position + glm::vec3(50.0f, 50.0f, 50.0f);
+        obj.box.color = glm::vec3(0.7f, 0.5f, 0.9f);   // purple for loaded meshes
+
+        int newIndex = static_cast<int>(objects.size()) - 1;
+
+        clearSelection();
+        selected = newIndex;
+        multiSelected.insert(newIndex);
+
+        spatialDirty = true;
+
+        Log::info("Mesh proxy successfully added at index " + std::to_string(newIndex));
+
+    } catch (const std::exception& e) {
+        Log::error("Exception in addMesh: " + std::string(e.what()));
+        throw;
+    } catch (...) {
+        Log::error("Unknown exception in addMesh");
+        throw std::runtime_error("vector");
+    }
+}

@@ -14,6 +14,7 @@
 #include "LineRenderer.h"
 #include "GizmoRenderer.h"
 #include "TriangularPrismMesh.h"
+#include "MeshRenderer.h"
 
 #include <vulkan/vulkan.h>
 #include <memory>
@@ -45,7 +46,8 @@ public:
                   MeshBuffer& gridMesh,
                   MeshBuffer& gizmoMesh,
                   LineBatch& lineBatch,
-                  ImGuiLayer& imgui
+                  ImGuiLayer& imgui,
+                  MeshRenderer& meshRenderer
     );
     SceneRenderer(const SceneRenderer&) = delete;
     SceneRenderer& operator=(const SceneRenderer&) = delete;
@@ -80,6 +82,7 @@ private:
     MeshBuffer& gizmoMesh;
     LineBatch& lineBatch;
     ImGuiLayer& imgui;
+    MeshRenderer& meshRenderer;
     
     // owned
     std::vector<std::unique_ptr<MeshBuffer>> prismCache;

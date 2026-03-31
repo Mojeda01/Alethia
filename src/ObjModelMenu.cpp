@@ -1,11 +1,17 @@
 #include "ObjModelMenu.h"
 #include "ObjLoader.h"
+#include "SceneEditor.h"
+#include "Log.h"
+
 #include <imgui.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <filesystem>
 #include <iostream>
 
 ObjModelMenu::ObjModelMenu(MeshRenderer& meshRenderer)
     : meshRenderer(meshRenderer)
+    , editor(editor)
 {
     refreshModelList();
 }
@@ -45,26 +51,38 @@ void ObjModelMenu::loadSelectedModel()
         statusMessage = "No model selected";
         return;
     }
-    
+
     std::string fullPath = assetsPath + "/" + selectedModel;
-    
+
     try {
         Mesh meshData = loadObj(fullPath);
-        
+
         if (meshData.vertices.empty()) {
             statusMessage = "Loaded mesh is empty: " + selectedModel;
             return;
         }
-        
+
+        const size_t vertexCount = meshData.vertices.size();
+        Log::info("Adding large mesh (" + std::to_string(vertexCount) + " verts) directly to MeshRenderer");
+
+        // 1. Register the mesh geometry with MeshRenderer
         uint32_t meshId = meshRenderer.loadMesh(meshData, selectedModel);
-        
-        statusMessage = "Successfully loaded: " + selectedModel
-        + " (" + std::to_string(meshData.vertices.size()) + " verts)";
-        
-        std::cout << "ObjModelMenu: Loaded " << selectedModel << " with ID " << meshId << "\n";
+
+        // 2. Add an instance for rendering
+        glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f));
+        meshRenderer.addInstance(meshId, transform, glm::vec3(1.0f, 1.0f, 1.0f));
+
+        statusMessage = "Successfully rendered: " + selectedModel
+                      + " (" + std::to_string(vertexCount) + " verts)";
+
+        Log::info("Large mesh rendered successfully with ID " + std::to_string(meshId));
+
     } catch (const std::exception& e) {
         statusMessage = "Failed to load " + selectedModel + ": " + e.what();
-        std::cerr << "ObjModelMenu error: " << e.what() << std::endl;
+        Log::error("ObjModelMenu load failed: " + std::string(e.what()));
+    } catch (...) {
+        statusMessage = "Failed to load " + selectedModel + ": unknown error";
+        Log::error("ObjModelMenu load failed with unknown exception");
     }
 }
 

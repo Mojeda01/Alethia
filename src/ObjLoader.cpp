@@ -2,6 +2,7 @@
 #include "external/tiny_obj_loader.h"
 #include "ObjLoader.h"
 #include "Mesh.h"
+#include "Log.h"
 
 #include <stdexcept>
 #include <unordered_map>
@@ -29,115 +30,88 @@ struct VertexKeyHash {
 };
 } // namespace
 
-Mesh loadObj(const std::string& objPath) {
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string warn, err;
-    std::string mtlDir = objPath.substr(0, objPath.find_last_of("/\\") + 1);
+Mesh loadObj(const std::string& objPath)
+{
+    try {
+        tinyobj::ObjReaderConfig reader_config;
+        reader_config.triangulate = true;
+        reader_config.vertex_color = false;
 
-    {
-        std::string testPath = mtlDir + "Castelia City.mtl";
-        std::ifstream testFile(testPath);
-        std::cout << "MTL test path: [" << testPath << "] exists: " << testFile.good() << "\n";
-    }
- 
-    std::string mtlPath = mtlDir + "Castelia City.mtl";
-    std::map<std::string, int> matMap;
-    std::ifstream mtlStream(mtlPath);
-    if (mtlStream.good()) {
-        tinyobj::LoadMtl(&matMap, &materials, &mtlStream, &warn, &err);
-        std::cout << "MTL loaded directly: " << materials.size() << " materials\n";
-        mtlStream.close();
-    }
-    bool ok = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
-            objPath.c_str(), mtlDir.c_str(), true);
+        tinyobj::ObjReader reader;
 
-    if (!ok) {
-        throw std::runtime_error("Failed to load OBJ: " + err);
-    }
-   
-    if (!warn.empty()) {
-        std::cout << "OBJ warning: " << warn << "\n";
-    }
-    if (!err.empty()) {
-        std::cout << "OBJ error: " << err << "\n";
-    }
-
-    std::cout << "OBJ loaded: " << materials.size() << " materials\n";
-    for (size_t i = 0; i < materials.size() && i < 5; ++i) {
-        std::cout << "  mat[" << i << "] name=" << materials[i].name
-            << " diffuse_texname=" << materials[i].diffuse_texname << "\n";
-    }
-    
-    Mesh mesh;
-        
-    std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVerts;
-
-    for (const auto& shape : shapes) {
-        size_t indexOffset = 0;
-        for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); ++f) {
-            int fv = shape.mesh.num_face_vertices[f];
-            int matId = -1;
-            if (f < shape.mesh.material_ids.size()) {
-                matId = shape.mesh.material_ids[f];
-            }
-            float r = 0.6f, g = 0.6f, b = 0.6f;
-            if (matId >= 0 && matId < static_cast<int>(materials.size())) {
-                r = materials[matId].diffuse[0];
-                g = materials[matId].diffuse[1];
-                b = materials[matId].diffuse[2];
-            }
-            for (int v = 1; v < fv - 1; ++v) {
-                int triIndices[3] = { 0, v, v + 1 };
-
-                for (int t = 0; t < 3; ++t) {
-                    tinyobj::index_t idx = shape.mesh.indices[indexOffset + triIndices[t]];
-                    VertexKey key{ idx.vertex_index, idx.normal_index, idx.texcoord_index };
-                    auto it = uniqueVerts.find(key);
-                    if (it != uniqueVerts.end()) {
-                        mesh.indices.push_back(it->second);
-                    } else {
-                        Vertex vert{};
-
-                        vert.position[0] = attrib.vertices[3 * idx.vertex_index + 0];
-                        vert.position[1] = attrib.vertices[3 * idx.vertex_index + 1];
-                        vert.position[2] = attrib.vertices[3 * idx.vertex_index + 2];
-
-                        vert.color[0] = r;
-                        vert.color[1] = g;
-                        vert.color[2] = b;
-
-                        if (idx.normal_index >= 0) {
-                            vert.normal[0] = attrib.normals[3 * idx.normal_index + 0];
-                            vert.normal[1] = attrib.normals[3 * idx.normal_index + 1];
-                            vert.normal[2] = attrib.normals[3 * idx.normal_index + 2];
-                        } else {
-                            vert.normal[0] = 0.0f;
-                            vert.normal[1] = 1.0f;
-                            vert.normal[2] = 0.0f;
-                        }
-
-                        if (idx.texcoord_index >= 0) {
-                            vert.texCoord[0] = attrib.texcoords[2 * idx.texcoord_index + 0];
-                            vert.texCoord[1] = 1.0f - attrib.texcoords[2 * idx.texcoord_index + 1];
-                        } else {
-                            vert.texCoord[0] = 0.0f;
-                            vert.texCoord[1] = 0.0f;
-                        }
-
-                        uint32_t newIndex = static_cast<uint32_t>(mesh.vertices.size());
-                        mesh.vertices.push_back(vert);
-                        mesh.indices.push_back(newIndex);
-                        uniqueVerts[key] = newIndex;
-                    }
-                }
-            }
-            indexOffset += fv;
+        if (!reader.ParseFromFile(objPath, reader_config)) {
+            std::string err = reader.Error();
+            if (err.empty()) err = "Unknown parse error";
+            Log::error("tinyobj ParseFromFile failed: " + err);
+            throw std::runtime_error(err);
         }
+
+        if (!reader.Warning().empty()) {
+            Log::warn("OBJ warning: " + reader.Warning());
+        }
+
+        const auto& attrib = reader.GetAttrib();
+        const auto& shapes = reader.GetShapes();
+
+        Log::info("OBJ parsed - vertices: " + std::to_string(attrib.vertices.size()/3)
+                  + ", shapes: " + std::to_string(shapes.size()));
+
+        Mesh mesh;
+        mesh.vertices.reserve(attrib.vertices.size() / 3);
+
+        for (const auto& shape : shapes) {
+            for (const auto& index : shape.mesh.indices) {
+                Vertex v{};
+
+                // Position
+                int vi = index.vertex_index * 3;
+                v.position[0] = attrib.vertices[vi];
+                v.position[1] = attrib.vertices[vi + 1];
+                v.position[2] = attrib.vertices[vi + 2];
+
+                // Normal
+                if (index.normal_index >= 0) {
+                    int ni = index.normal_index * 3;
+                    v.normal[0] = attrib.normals[ni];
+                    v.normal[1] = attrib.normals[ni + 1];
+                    v.normal[2] = attrib.normals[ni + 2];
+                } else {
+                    v.normal[0] = 0.0f;
+                    v.normal[1] = 1.0f;
+                    v.normal[2] = 0.0f;
+                }
+
+                // Texcoord (flip Y for Vulkan)
+                if (index.texcoord_index >= 0) {
+                    int ti = index.texcoord_index * 2;
+                    v.texCoord[0] = attrib.texcoords[ti];
+                    v.texCoord[1] = 1.0f - attrib.texcoords[ti + 1];
+                } else {
+                    v.texCoord[0] = 0.0f;
+                    v.texCoord[1] = 0.0f;
+                }
+
+                v.color[0] = 0.8f;
+                v.color[1] = 0.8f;
+                v.color[2] = 0.8f;
+
+                mesh.vertices.push_back(v);
+                mesh.indices.push_back(static_cast<uint32_t>(mesh.vertices.size() - 1));
+            }
+        }
+
+        Log::info("Mesh built successfully: " + std::to_string(mesh.vertices.size())
+                  + " vertices, " + std::to_string(mesh.indices.size()) + " indices");
+
+        return mesh;
+
+    } catch (const std::exception& e) {
+        Log::error("loadObj failed for " + objPath + ": " + e.what());
+        std::cerr << "loadObj EXCEPTION: " << e.what() << std::endl;
+        throw;
+    } catch (...) {
+        Log::error("loadObj failed for " + objPath + ": unknown exception");
+        std::cerr << "loadObj UNKNOWN EXCEPTION" << std::endl;
+        throw std::runtime_error("vector");
     }
-    if (mesh.vertices.empty()) {
-        throw std::runtime_error("OBJ file contains no geometry: " + objPath);
-    }
-    return mesh;
 }

@@ -2,6 +2,8 @@
 
 #include "Mesh.h"
 #include "MeshRenderer.h"
+#include "SceneEditor.h"
+
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -15,6 +17,7 @@ public:
     void setAssetsPath(const std::string& path) { assetsPath = path; refreshModelList(); }
 private:
     MeshRenderer& meshRenderer;
+    SceneEditor& editor;
     bool visible = true;
     std::string assetsPath = "assets/models";
     std::vector<std::string> modelFiles;

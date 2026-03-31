@@ -109,7 +109,7 @@ VulkanApp::VulkanApp(int width, int height, const char* title)
                     swapchainBundle, uniformBuffer,
                     triangle, grid, lineRenderer,
                     gizmo, cubeMesh, gridMesh, gizmoMesh,
-                    lineBatch, imgui)
+                    lineBatch, imgui, meshRenderer)
 {
     auto now = std::chrono::steady_clock::now();
     startTime = now;
