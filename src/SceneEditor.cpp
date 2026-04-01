@@ -240,7 +240,7 @@ int SceneEditor::hitTestSurface(const glm::vec3& rayOrigin, const glm::vec3& ray
     for (int i : candidates) {
         float t = 0.0f;
         int face = hitTestCube(rayOrigin, rayDir, i, t);
-        if (face == 2 && t < closestT) {
+        if (face >= 0 && t < closestT) {
             closestT = t;
             hitIndex = i;
         }
@@ -338,6 +338,9 @@ void SceneEditor::update(const InputManager& input, const Camera& camera, GLFWwi
                 multiSelected.insert(newIndex);
                 selected = newIndex;
                 pushSnapshot();
+                
+                spatialDirty = true;
+                
                 Log::info("Cube placed: Y=" + std::to_string(placementY) +
                             " (" + std::to_string(preview.min.x) + ", " +
                             std::to_string(preview.min.z) + ") to (" +
