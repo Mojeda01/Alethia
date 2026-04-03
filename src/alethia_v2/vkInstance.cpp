@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
 #include <stdexcept>
 #include <vector>
 #include <cstring>
@@ -17,7 +18,7 @@ static const std::vector<const char*> validationLayers = {
 };
 
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallbak(
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT      severity,
     VkDebugUtilsMessageTypeFlagsEXT             type,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -42,7 +43,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallbak(
 static bool checkValidationLayerSupport() {
     uint32_t layerCount = 0;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-    std::vector<VkLayerProperties> available(layerCounter);
+    std::vector<VkLayerProperties> available(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, available.data());
     
     bool allFound = true;
@@ -210,7 +211,6 @@ VkDebugUtilsMessengerEXT createDebugMessenger(VkInstance instance) {
 #endif
 }
 
-// Call before vkDestroyInstance
 void destroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger) {
 #ifndef NDEBUG
     if (messenger == VK_NULL_HANDLE) return;
@@ -220,5 +220,9 @@ void destroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messeng
     if (func != nullptr) {
         func(instance, messenger, nullptr);
     }
+#else
+    // In release, messenger should always be VK_NULL_HANDLE —
+    // createDebugMessenger returns it unconditionally.
+    assert(messenger == VK_NULL_HANDLE);
 #endif
 }
