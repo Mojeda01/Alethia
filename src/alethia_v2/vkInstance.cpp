@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
+#include <cassert>
 
 #ifdef _WIN32
     #include <debugapi.h>
@@ -20,11 +21,10 @@ static const std::vector<const char*> validationLayers = {
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT      severity,
-    VkDebugUtilsMessageTypeFlagsEXT             type,
+    [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     [[maybe_unused]] void*                      pUserData
     ){
-    [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT unusedType = type;
     
     if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         std::cerr << "[Vulkan] " << pCallbackData->pMessage << "\n";

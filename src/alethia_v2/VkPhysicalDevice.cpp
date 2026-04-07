@@ -63,29 +63,24 @@ static int scoreDevice(VkPhysicalDevice device)
     if (features10.fillModeNonSolid)    score += 20;
     if (features10.shaderInt64)         score += 20;
 
-    // 1.2 features
+    // 1.2 + 1.3 features.
     VkPhysicalDeviceVulkan12Features features12{};
     features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 
-    VkPhysicalDeviceFeatures2 query12{};
-    query12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    query12.pNext = &features12;
-    vkGetPhysicalDeviceFeatures2(device, &query12);
+    VkPhysicalDeviceVulkan13Features features13{};
+    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features12.pNext = &features13;
+    
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &features12;
+    vkGetPhysicalDeviceFeatures2(device, &query);
 
     if (features12.bufferDeviceAddress)     score += 100;
     if (features12.descriptorIndexing)      score += 100;
     if (features12.runtimeDescriptorArray)  score += 80;
     if (features12.timelineSemaphore)       score += 80;
     if (features12.scalarBlockLayout)       score += 40;
-
-    // 1.3 features
-    VkPhysicalDeviceVulkan13Features features13{};
-    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-
-    VkPhysicalDeviceFeatures2 query13{};
-    query13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    query13.pNext = &features13;
-    vkGetPhysicalDeviceFeatures2(device, &query13);
 
     if (features13.dynamicRendering)    score += 100;
     if (features13.synchronization2)   score += 100;
@@ -222,7 +217,8 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surfa
     vkGetPhysicalDeviceQueueFamilyProperties(device, &count, nullptr);
     std::vector<VkQueueFamilyProperties> families(count);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &count, families.data());
-
+    
+    indices.timestampValidBits.resize(count);
     for (uint32_t i = 0; i < count; ++i) {
         const VkQueueFlags flags = families[i].queueFlags;
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <unordered_map>
 #include <vector>
 #include <optional>
 #include <cstdint>
@@ -14,8 +13,7 @@ struct QueueFamilyIndices
     std::optional<uint32_t> transfer;
     std::optional<uint32_t> present;
     
-    // family index
-    std::unordered_map<uint32_t, uint32_t> timestampValidBits;
+    std::vector<uint32_t> timestampValidBits; // indexed by family index
     
     bool isComplete() const
     {
@@ -39,7 +37,7 @@ VkPhysicalDevice selectPhysicalDevice(VkInstance instance);
 
 void buildEnabledFeatures(
                           VkPhysicalDevice device,
-                          VkPhysicalDeviceFeatures outFeatures10,
+                          VkPhysicalDeviceFeatures& outFeatures10,
                           VkPhysicalDeviceVulkan12Features& outFeatures12,
                           VkPhysicalDeviceVulkan13Features& outFeatures13);
 
