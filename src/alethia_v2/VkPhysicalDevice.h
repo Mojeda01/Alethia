@@ -46,7 +46,7 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surfa
 SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 
 // Extension support
-bool checkDeviceExtentionSupport(
+bool checkDeviceExtensionSupport(
                                  VkPhysicalDevice device,
                                  const std::vector<const char*>& required
                                  );
