@@ -16,7 +16,7 @@ struct LogicalDevice{
 // Creates a VkDevice from the selected physical device.
 LogicalDevice createLogicalDevice(
     VkPhysicalDevice physical,
-    const QueueFamilyIndieces& indices,
+    const QueueFamilyIndices& indices, 
     VkPhysicalDeviceFeatures& features10,
     VkPhysicalDeviceVulkan12Features& features12,
     VkPhysicalDeviceVulkan13Features& features13

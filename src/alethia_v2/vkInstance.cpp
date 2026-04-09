@@ -80,7 +80,7 @@ static bool checkExtensionSupport(const std::vector<const char*>& required)
             }
         }
         if (!found) {
-            std::cerr << "[vulkan] Required extension not available: " << name << "\n";
+            std::cerr << "[Vulkan] Required extension not available: " << name << "\n";
             allFound = false;
         }
     }

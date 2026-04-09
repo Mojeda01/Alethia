@@ -13,7 +13,7 @@ static const std::vector<const char*> kValidationLayers = {
 
 static std::vector<VkDeviceQueueCreateInfo> buildQueueCreateInfos(const QueueFamilyIndices& indices, const float& priority)
 {
-    std::unordered_map<uint32_t> unique;
+    std::unordered_set<uint32_t> unique;
     
     // Only add indices that are actually populated.
     if (indices.graphics) unique.insert(*indices.graphics);
@@ -74,7 +74,7 @@ LogicalDevice createLogicalDevice(
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueInfos.size());
     createInfo.pQueueCreateInfos = queueInfos.data();
     createInfo.enabledExtensionCount = static_cast<uint32_t> (deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = devieExtensions.data();
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data(); 
     
 #ifndef NDEBUG
     // Deprecciated in Vulkan 1.1+ but some older drivers still read it
