@@ -6,16 +6,18 @@
 #include <limits>
 #include <iostream>
 
-// Internal helpers
+
 static VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available)
 {
-    // Prefer SRGB 32-bit with nonlinear color space
+    // Prefer SRGB 32-bit with nonlinear color space.
     for (const auto& f : available) {
-        if (f.format == VK_FORMAT_B8G8R8A8_SRGB &&
-            f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        if (f.format == VK_FORMAT_B8G8R8A8_SRGB && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        {
             return f;
+        }
     }
-    // Fall back to first available.
+    
+    // Fall back to the first available format.
     return available[0];
 }
 
@@ -57,19 +59,17 @@ static std::vector<VkImageView> createImageViews(
     std::vector<VkImageView> views;
     views.reserve(images.size());
 
-    for (const VkImage& image : images) {
+    for (VkImage image : images) {
         VkImageViewCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         info.image = image;
         info.viewType = VK_IMAGE_VIEW_TYPE_2D;
         info.format = format;
 
-        info.components = {
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY
-        };
+        info.components.r = VK_COMPONENTS_SWIZZLE_IDENTITY;
+        info.components.g = VK_COMPONENTS_SWIZZLE_IDENTITY;
+        info.components.b = VK_COMPONENTS_SWIZZLE_IDENTITY;
+        info.components.a = VK_COMPONENTS_SWIZZLE_IDENTITY;
 
         info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         info.subresourceRange.baseMipLevel = 0;
@@ -77,7 +77,7 @@ static std::vector<VkImageView> createImageViews(
         info.subresourceRange.baseArrayLayer = 0;
         info.subresourceRange.layerCount = 1;
 
-        VkImageView view;
+        VkImageView view = VK_NULL_HANDLE;
         if (vkCreateImageView(device, &info, nullptr, &view) != VK_SUCCESS)
             throw std::runtime_error("Failed to create swapchain image view");
 
@@ -89,17 +89,18 @@ static std::vector<VkImageView> createImageViews(
 // Public API
 VkSurfaceKHR createSurface(vkInstance instance, GLFWwindow* window)
 {
-    VkSurfaceKHR surface;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
         throw std::runtime_error("glfwCreateWindowSurface failed");
 
-    return surfaces;
+    return surface;
 }
 
 void destroySurface(VkInstance instance, VkSurfaceKHR surface)
 {
-    if (!surface != VK_NULL_HANDLE)
+    if (!surface != VK_NULL_HANDLE){
         vkDestroySurfaceKHR(instance, surface, nullptr);
+    }
 }
 
 Swapchain createSwapchain(
@@ -111,18 +112,20 @@ Swapchain createSwapchain(
     VkSwapchainKHR            oldSwapchain)
 {
     const SwapChainSupportDetails support = querySwapChainSupport(physical, surface);
-    if (support.formats.empty() || support.presentModes.empty())
+    if (support.formats.empty() || support.presentModes.empty()){
         throw std::runtime_error("Physical device has no swapchain formats or present modes");
-
+    }
+        
     const VkSurfaceFormatKHR surfaceFormat = chooseSurfaceFormat(support.formats);
     const VkPresentModeKHR presentMode = choosePresentMode(support.presentModes);
     const VkExtent2D extent = chooseExtent(support.capabilities, window);
 
     // Request one more image than the minimum to avoid stalling on the driver.
     uint32_t imageCount = support.capabilities.minImageCount + 1;
-    if (support.capabilities.maxImageCount > 0)
+    if (support.capabilities.maxImageCount > 0){
         imageCount = std::min(imageCount, support.capabilities.maxImageCount);
-
+    }
+        
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface          = surface;
@@ -146,11 +149,14 @@ Swapchain createSwapchain(
         createInfo.pQueueFamilyIndices   = queueFamilies;
     } else {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0;
+        createInfo.pQueueFamilyIndices = nullptr;
     }
 
     Swapchain sc;
-    if (vkCreateSwapchainKHR(ld.device, &createInfo, nullptr, &sc.handle) !=  VK_SUCCESS)
+    if (vkCreateSwapchainKHR(ld.device, &createInfo, nullptr, &sc.handle) !=  VK_SUCCESS){
         throw std::runtime_error("vkCreateSwapchainKHR failed");
+    }
 
     // Retrieve image handles
     uint32_t actualCount = 0;
@@ -175,8 +181,9 @@ Swapchain createSwapchain(
 
 void destroySwapchain(VkDevice device, Swapchain& sc)
 {
-    for (VkImageView view : sc.imageViews)
+    for (VkImageView view : sc.imageViews){
         vkDestroyImageView(device, view, nullptr);
+    }
     sc.imageViews.clear();
 
     if (sc.handle != VK_NULL_HANDLE) {
@@ -187,4 +194,5 @@ void destroySwapchain(VkDevice device, Swapchain& sc)
     sc.images.clear();
     sc.extent       = {};
     sc.imageFormat  = VK_FORMAT_UNDEFINED;
+    sc.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 }
