@@ -35,7 +35,7 @@ static VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& a
 static VkExtent2D chooseExtent(const VkSurfaceCapabilitiesKHR& caps, GLFWwindow* window)
 {
     // If the driver has set a fixed extent, use it 
-    if (caps.currentextent.width != std::numeric_limits<uint32_t>::max())
+    if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max())
         return caps.currentExtent;
 
     // Otherwise clamp the framebuffer size to the allowed range.
@@ -66,7 +66,7 @@ static std::vector<VkImageView> createImageViews(
         info.viewType = VK_IMAGE_VIEW_TYPE_2D;
         info.format = format;
 
-        info.components.r = VK_COMPONENTS_SWIZZLE_IDENTITY;
+        info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.g = VK_COMPONENTS_SWIZZLE_IDENTITY;
         info.components.b = VK_COMPONENTS_SWIZZLE_IDENTITY;
         info.components.a = VK_COMPONENTS_SWIZZLE_IDENTITY;
@@ -81,13 +81,13 @@ static std::vector<VkImageView> createImageViews(
         if (vkCreateImageView(device, &info, nullptr, &view) != VK_SUCCESS)
             throw std::runtime_error("Failed to create swapchain image view");
 
-        view.push_back(view);
+        views.push_back(view);
     }
     return views;
 }
 
 // Public API
-VkSurfaceKHR createSurface(vkInstance instance, GLFWwindow* window)
+VkSurfaceKHR createSurface(VkInstance instance, GLFWwindow* window)
 {
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
@@ -98,7 +98,7 @@ VkSurfaceKHR createSurface(vkInstance instance, GLFWwindow* window)
 
 void destroySurface(VkInstance instance, VkSurfaceKHR surface)
 {
-    if (!surface != VK_NULL_HANDLE){
+    if (surface != VK_NULL_HANDLE){
         vkDestroySurfaceKHR(instance, surface, nullptr);
     }
 }

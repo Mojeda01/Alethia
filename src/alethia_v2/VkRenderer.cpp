@@ -98,7 +98,7 @@ std::array<VkCommandBuffer, Renderer::kFramesInFlight> allocateCommandBuffer(VkD
 }
 
 FrameSync createFrameSync (VkDevice device) {
-    Framesync  sync{};
+    FrameSync  sync{};
     
     VkSemaphoreCreateInfo semInfo{};
     semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -133,7 +133,7 @@ void destroyFrameSync (VkDevice device, FrameSync& sync) {
     
     if (sync.renderFinished != VK_NULL_HANDLE) {
         vkDestroySemaphore(device, sync.renderFinished, nullptr);
-        sync.renderFinished = Vk_NULL_HANDLE;
+        sync.renderFinished = VK_NULL_HANDLE;
     }
     
     if (sync.inFlight != VK_NULL_HANDLE) {
@@ -156,7 +156,7 @@ void transitionImage(
 {
     VkImageMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-    barrier.srcStagemask = srcStageMask;
+    barrier.srcStageMask = srcStageMask;
     barrier.srcAccessMask = srcAccessMask;
     barrier.dstStageMask = dstStageMask;
     barrier.dstAccessMask = dstAccessMask;
@@ -312,7 +312,7 @@ Renderer createRenderer(
     renderer.window = window;
     renderer.imageInFlight.fill(VK_NULL_HANDLE);
 
-    renderer.graphicsCommandPool = createGraphicsCommandPool(renderer.logicalDevice.device, renderer.queueFamilies.graphics);
+    renderer.graphicsCommandPool = createGraphicsCommandPool(renderer.logicalDevice.device, *renderer.queueFamilies.graphics);
 
     renderer.commandBuffers = allocateCommandBuffers(renderer.logicalDevice.device, renderer.graphicsCommandPool);
 
