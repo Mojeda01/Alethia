@@ -27,17 +27,17 @@ struct Renderer{
     static constexpr uint32_t kFramesInFlight = 2;
     
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    LogicalDevice logicalDevice();
+    LogicalDevice logicalDevice{};
     QueueFamilyIndices queueFamilies{};
     
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     GLFWwindow* window = nullptr;
     
-    Swapchain swapchain();
+    Swapchain swapchain{};
     DepthResources depth{};
     
     VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
-    std::array<VkCommandBuffer, kFramesInFlight> commandBuffers();
+    std::array<VkCommandBuffer, kFramesInFlight> commandBuffers{};
     std::array<FrameSync, kFramesInFlight> frames{};
     
     std::array<VkFence, kFramesInFlight> imageInFlight{};
