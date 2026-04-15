@@ -1,5 +1,7 @@
 #include "VulkanApp.h"
 #include "SwapchainBundle.h"
+#include "alethia_v2/initv2.h"
+
 #include <iostream>
 
 int main() {
@@ -21,7 +23,12 @@ int main() {
             break;
         }
         case 2:
-            std::cout << "Alethia v2 — coming soon\n";
+            try{
+                runAlethiaV2();
+            } catch (const std::exception& e) {
+                std::cerr << e.what() << "\n";
+                return 1;
+            } 
             break;
         default:
             std::cerr << "Invalid selection\n";

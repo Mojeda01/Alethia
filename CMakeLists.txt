@@ -179,3 +179,30 @@ target_compile_definitions(VulkanLab PRIVATE VULKANLAB_SHADER_DIR="${SHADER_BIN_
 add_dependencies(VulkanLab VulkanLabShaders)
 target_include_directories(VulkanLab PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/external/imgui)
 target_link_libraries(VulkanLab PRIVATE Vulkan::Vulkan glfw VulkanTriangle)
+
+## Alethia V2
+add_subdirectory(src/alethia_v2)
+target_link_libraries(VulkanLab PRIVATE alethia_v2)
+
+set(V2_VERT_SPV ${SHADER_BIN_DIR}/v2_triangle.vert.spv)
+set(V2_FRAG_SPV ${SHADER_BIN_DIR}/v2_triangle.frag.spv)
+
+add_custom_command(
+    OUTPUT ${V2_VERT_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/alethia_v2/shaders/triangle.vert
+        -o ${V2_VERT_SPV}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/alethia_v2/shaders/triangle.vert
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${V2_FRAG_SPV}
+    COMMAND ${SHADER_COMPILER} ${SHADER_COMPILER_ARGS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/alethia_v2/shaders/triangle.frag
+        -o ${V2_FRAG_SPV}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/alethia_v2/shaders/triangle.frag
+    VERBATIM
+)
+
+add_custom_target(AlethiaV2Shaders DEPENDS ${V2_VERT_SPV} ${V2_FRAG_SPV})

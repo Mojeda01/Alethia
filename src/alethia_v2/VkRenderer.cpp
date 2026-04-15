@@ -1,4 +1,5 @@
 #include "VkRenderer.h"
+#include "VkPipeline.h"
 
 #include <array>
 #include <stdexcept>
@@ -178,7 +179,7 @@ void transitionImage(
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-void recordClearPass(Renderer& renderer, VkCommandBuffer cmd, uint32_t imageIndex)
+void recordDrawPass(Renderer& renderer, VkCommandBuffer cmd, uint32_t imageIndex)
 {
     const VkImage swapImage = renderer.swapchain.images[imageIndex];
     transitionImage(
@@ -239,6 +240,27 @@ void recordClearPass(Renderer& renderer, VkCommandBuffer cmd, uint32_t imageInde
     renderingInfo.pDepthAttachment = &depthAttachment;
     renderingInfo.pStencilAttachment = nullptr;
     vkCmdBeginRendering(cmd, &renderingInfo);
+
+    // Bind pipeline
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.pipeline.handle);
+
+    // Set dynamic viewport and scissor.
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(renderer.swapchain.extent.width);
+    viewport.height = static_cast<float>(renderer.swapchain.extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = renderer.swapchain.extent;
+    vkCmdSetScissor(cmd, 0, 1, &scissor); 
+
+    //draw the hardcoded triangle
+    vkCmdDraw(cmd, 3, 1, 0, 0);
     vkCmdEndRendering(cmd);
 
     transitionImage(
@@ -314,7 +336,7 @@ Renderer createRenderer(
 
     renderer.graphicsCommandPool = createGraphicsCommandPool(renderer.logicalDevice.device, *renderer.queueFamilies.graphics);
 
-    renderer.commandBuffers = allocateCommandBuffers(renderer.logicalDevice.device, renderer.graphicsCommandPool);
+    renderer.commandBuffers = allocateCommandBuffer(renderer.logicalDevice.device, renderer.graphicsCommandPool);
 
     try{
         createSwapchainDependentResources(renderer, VK_NULL_HANDLE);
@@ -432,7 +454,7 @@ void drawFrame(Renderer& renderer) {
         throw std::runtime_error("vkBeginCommandBuffer failed");
     }
 
-    recordClearPass(renderer, cmd, imageIndex);
+    recordDrawPass(renderer, cmd, imageIndex); 
 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
         throw std::runtime_error("vkEndCommandBuffer failed");

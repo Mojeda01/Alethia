@@ -26,7 +26,7 @@ static VkShaderModule createShaderModule(VkDevice device, const std::vector<char
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t>(code.data());
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
     VkShaderModule shaderModule = VK_NULL_HANDLE;
     if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) 
@@ -38,7 +38,7 @@ static VkShaderModule createShaderModule(VkDevice device, const std::vector<char
 
 // Public API
 
-Pipeline createTrianglePipeline(VkDevice device, VkFormat colorFormat, VkFormat depthFormat, const std::string& vertSpvPath, std::string& fragSpvPath)
+Pipeline createTrianglePipeline(VkDevice device, VkFormat colorFormat, VkFormat depthFormat, const std::string& vertSpvPath,  const std::string& fragSpvPath)
 {
     // shader stages
     const std::vector<char> vertCode = readFile(vertSpvPath);
@@ -53,6 +53,12 @@ Pipeline createTrianglePipeline(VkDevice device, VkFormat colorFormat, VkFormat 
     vertStage.module = vertModule;
     vertStage.pName = "main";
     
+    VkPipelineShaderStageCreateInfo fragStage{};
+    fragStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragStage.module = fragModule;
+    fragStage.pName = "main";
+
     const VkPipelineShaderStageCreateInfo stages[] = { vertStage, fragStage };
     
     // Vertex input
@@ -60,7 +66,7 @@ Pipeline createTrianglePipeline(VkDevice device, VkFormat colorFormat, VkFormat 
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     
     // Input assembly
-    VkPipelineInputAssemblyCreateInfo inputAssembly{};
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
@@ -137,7 +143,7 @@ Pipeline createTrianglePipeline(VkDevice device, VkFormat colorFormat, VkFormat 
     VkPipelineRenderingCreateInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     renderingInfo.colorAttachmentCount = 1;
-    renderingInfoo.pColorAttachmentFormats = &colorFormat;
+    renderingInfo.pColorAttachmentFormats = &colorFormat;
     renderingInfo.depthAttachmentFormat = depthFormat;
     renderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
     

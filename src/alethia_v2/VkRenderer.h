@@ -8,7 +8,7 @@
 #include "VkLogicalDevice.h"
 #include "VkPhysicalDevice.h"
 #include "VkSwapchain.h"
-
+#include "VkPipeline.h"
 
 struct FrameSync{
     VkSemaphore imageAvailable = VK_NULL_HANDLE;
@@ -36,6 +36,8 @@ struct Renderer{
     Swapchain swapchain{};
     DepthResources depth{};
     
+    Pipeline pipeline{};
+
     VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
     std::array<VkCommandBuffer, kFramesInFlight> commandBuffers{};
     std::array<FrameSync, kFramesInFlight> frames{};
