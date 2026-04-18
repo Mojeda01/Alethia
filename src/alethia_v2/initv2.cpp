@@ -56,6 +56,27 @@ void runAlethiaV2()
             auto* r = static_cast<Renderer*>(glfwGetWindowUserPointer(w));
             notifyFramebufferResized(*r);
     });
+    
+    // Shader hot-reload on R key 
+    glfwSetKeyCallback(window, [](GLFWwindow* w, int key, int, int action, int) {
+        if (key == GLFW_KEY_R && action == GLFW_PRESS) {
+            auto* r = static_cast<Renderer*>(glfwGetWindowUserPointer(w));
+            std::cout << "[Vulkan] Reloading shaders (R pressed)...\n";
+
+            const bool success = reloadTrianglePipeline(
+                r->logicalDevice.device,
+                r->pipeline,
+                r->swapchain.imageFormat,
+                r->depth.format,
+                ALETHIA_V2_SHADER_DIR "/v2_triangle.vert.spv",
+                ALETHIA_V2_SHADER_DIR "/v2_triangle.frag.spv"
+            );
+
+            if (success) {
+                std::cout << "[Vulkan] Pipeline reloaded — animation should now be active!\n";
+            }
+        }
+    });
 
     // Pipeline
     renderer.pipeline = createTrianglePipeline(

@@ -131,6 +131,15 @@ Pipeline createTrianglePipeline(VkDevice device, VkFormat colorFormat, VkFormat 
     VkPipelineLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     
+    // push constant range for time 
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(float);
+
+    layoutInfo.pushConstantRangeCount = 1;
+    layoutInfo.pPushConstantRanges = &pushConstantRange;
+
     Pipeline pipeline{};
     if (vkCreatePipelineLayout(device, &layoutInfo, nullptr, &pipeline.layout) != VK_SUCCESS)
     {
@@ -192,5 +201,26 @@ void destroyPipeline(VkDevice device, Pipeline& pipeline)
     if (pipeline.layout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(device, pipeline.layout, nullptr);
         pipeline.layout = VK_NULL_HANDLE;
+    }
+}
+
+bool reloadTrianglePipeline(
+    VkDevice device,
+    Pipeline& pipeline,
+    VkFormat colorFormat,
+    VkFormat depthFormat,
+    const std::string& vertSpvPath,
+    const std::string& fragSpvPath
+)
+{
+    destroyPipeline(device, pipeline);
+    try{
+        pipeline = createTrianglePipeline(device, colorFormat, depthFormat, vertSpvPath, fragSpvPath);
+        std::cout << "[Vulkan] Triangle pipeline reloaded with push constants\n";
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "[Vulkan] Pipeline reload failed: " << e.what() << "\n";
+        pipeline = {}; // safe reset
+        return false;
     }
 }

@@ -18,3 +18,13 @@ Pipeline createTrianglePipeline(
 );
 
 void destroyPipeline(VkDevice device, Pipeline& pipeline);
+
+// hot-reload helper
+bool reloadTrianglePipeline(
+    VkDevice device,
+    Pipeline& pipeline,
+    VkFormat colorFormat,
+    VkFormat depthFormat,
+    const std::string& vertSpvPath,
+    const std::string& fragSpvPath
+);

@@ -1,6 +1,7 @@
 #include "VkRenderer.h"
 #include "VkPipeline.h"
 
+#include <GLFW/glfw3.h>
 #include <array>
 #include <stdexcept>
 
@@ -258,6 +259,17 @@ void recordDrawPass(Renderer& renderer, VkCommandBuffer cmd, uint32_t imageIndex
     scissor.offset = {0, 0};
     scissor.extent = renderer.swapchain.extent;
     vkCmdSetScissor(cmd, 0, 1, &scissor); 
+
+    // Push current time to the shader every time 
+    float currentTime = static_cast<float>(glfwGetTime());
+    vkCmdPushConstants(
+        cmd,
+        renderer.pipeline.layout,
+        VK_SHADER_STAGE_VERTEX_BIT,
+        0,
+        sizeof(float),
+        &currentTime
+    );
 
     //draw the hardcoded triangle
     vkCmdDraw(cmd, 3, 1, 0, 0);
