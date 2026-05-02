@@ -46,7 +46,7 @@ DepthResources createDepthResources(VkPhysicalDevice physicalDevice, VkDevice de
 {
     DepthResources depth{};
     depth.format = findSupportedDepthFormat(physicalDevice);
-    
+
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -61,22 +61,34 @@ DepthResources createDepthResources(VkPhysicalDevice physicalDevice, VkDevice de
     imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    
-    VkMemoryRequirements memReq;
+
+    if (vkCreateImage(device, &imageInfo, nullptr, &depth.image) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create depth image");
+    }
+
+    VkMemoryRequirements memReq{};
     vkGetImageMemoryRequirements(device, depth.image, &memReq);
 
-    uint32_t memType = findMemoryType(physicalDevice, memReq.memoryTypeBits, 
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    
+    uint32_t memType = findMemoryType(physicalDevice, memReq.memoryTypeBits,
+                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReq.size;
     allocInfo.memoryTypeIndex = memType;
 
-    if (vkAllocatorMemory(device, &allocInfo, nullptr, &depth.memory) != VK_SUCCESS) {
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &depth.memory) != VK_SUCCESS) {
+        vkDestroyImage(device, depth.image, nullptr);
         throw std::runtime_error("Failed to allocate depth memory");
     }
-    vkBindImageMemory(device, depth.image, depth.memory, 0);
-
+ 
+    if (vkBindImageMemory(device, depth.image, depth.memory, 0) != VK_SUCCESS) {
+        vkDestroyImage(device, depth.image, nullptr);
+        vkFreeMemory(device, depth.memory, nullptr);
+        throw std::runtime_error("Failed to bind depth memory");
+    }
+    
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = depth.image;
@@ -88,10 +100,12 @@ DepthResources createDepthResources(VkPhysicalDevice physicalDevice, VkDevice de
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    if (vkCreateImage(device, &imageInfo, nullptr, &depth.image) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create depth image");
+    if (vkCreateImageView(device, &viewInfo, nullptr, &depth.view) != VK_SUCCESS) {
+        vkDestroyImage(device, depth.image, nullptr);
+        vkFreeMemory(device, depth.memory, nullptr);
+        throw std::runtime_error("Failed to create depth image view");
     }
-    
+
     return depth;
 }
 
@@ -379,7 +393,8 @@ Renderer createRenderer(
     renderer.window = window;
     renderer.imageInFlight.fill(VK_NULL_HANDLE);
 
-    renderer.graphicsCommandPool = createGraphicsCommandPool(renderer.logicalDevice.device, *renderer.queueFamilies.graphics);
+    renderer.graphicsCommandPool = createGraphicsCommandPool(renderer.logicalDevice.device, 
+            *renderer.queueFamilies.graphics);
 
     renderer.commandBuffers = allocateCommandBuffer(renderer.logicalDevice.device, renderer.graphicsCommandPool);
 
@@ -424,9 +439,12 @@ void recreateRendererSwapchain(Renderer& renderer)
 {
     waitForValidFramebufferSize(renderer.window);
     vkDeviceWaitIdle(renderer.logicalDevice.device);
+    
+    // Save old resources before creating new ones 
     VkSwapchainKHR oldSwapchain = renderer.swapchain.handle;
-    destroyDepthResources(renderer.logicalDevice.device, renderer.depth);
+    DepthResources oldDepth = renderer.depth;
 
+    // create new resource first 
     renderer.swapchain = createSwapchain(
         renderer.physicalDevice,
         renderer.logicalDevice,
@@ -441,6 +459,9 @@ void recreateRendererSwapchain(Renderer& renderer)
         renderer.logicalDevice.device,
         renderer.swapchain.extent
     );
+
+    // safely destroy old resources 
+    destroyDepthResources(renderer.logicalDevice.device, oldDepth);
 
     if (oldSwapchain != VK_NULL_HANDLE) {
         Swapchain old{};
