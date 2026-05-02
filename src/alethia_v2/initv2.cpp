@@ -68,8 +68,8 @@ void runAlethiaV2()
                 r->pipeline,
                 r->swapchain.imageFormat,
                 r->depth.format,
-                ALETHIA_V2_SHADER_DIR "/v2_triangle.vert.spv",
-                ALETHIA_V2_SHADER_DIR "/v2_triangle.frag.spv"
+                ALETHIA_V2_SHADER_DIR "/triangle.vert.spv",
+                ALETHIA_V2_SHADER_DIR "/triangle.frag.spv"
             );
 
             if (success) {
@@ -83,8 +83,8 @@ void runAlethiaV2()
         logical.device,
         renderer.swapchain.imageFormat,
         renderer.depth.format,
-        ALETHIA_V2_SHADER_DIR "/v2_triangle.vert.spv",
-        ALETHIA_V2_SHADER_DIR "/v2_triangle.frag.spv"
+        ALETHIA_V2_SHADER_DIR "/triangle.vert.spv",
+        ALETHIA_V2_SHADER_DIR "/triangle.frag.spv"
     );
 
     // Game loop

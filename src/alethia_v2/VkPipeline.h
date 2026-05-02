@@ -28,3 +28,12 @@ bool reloadTrianglePipeline(
     const std::string& vertSpvPath,
     const std::string& fragSpvPath
 );
+
+struct PushConstants{
+    float time;
+    float resolutionX;
+    float resolutionY;
+    float mouseX;
+    float mouseY;
+    float mousePressed;
+};

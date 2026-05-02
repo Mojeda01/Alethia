@@ -62,6 +62,32 @@ DepthResources createDepthResources(VkPhysicalDevice physicalDevice, VkDevice de
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     
+    VkMemoryRequirements memReq;
+    vkGetImageMemoryRequirements(device, depth.image, &memReq);
+
+    uint32_t memType = findMemoryType(physicalDevice, memReq.memoryTypeBits, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.memoryTypeIndex = memType;
+
+    if (vkAllocatorMemory(device, &allocInfo, nullptr, &depth.memory) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate depth memory");
+    }
+    vkBindImageMemory(device, depth.image, depth.memory, 0);
+
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = depth.image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = depth.format;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
     if (vkCreateImage(device, &imageInfo, nullptr, &depth.image) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create depth image");
     }
@@ -260,19 +286,26 @@ void recordDrawPass(Renderer& renderer, VkCommandBuffer cmd, uint32_t imageIndex
     scissor.extent = renderer.swapchain.extent;
     vkCmdSetScissor(cmd, 0, 1, &scissor); 
 
-    // Push current time to the shader every time 
-    float currentTime = static_cast<float>(glfwGetTime());
+   
+    PushConstants push{};
+    push.time = static_cast<float>(glfwGetTime());
+    push.resolutionX = static_cast<float>(renderer.swapchain.extent.width);
+    push.resolutionY = static_cast<float>(renderer.swapchain.extent.height);
+    push.mouseX = 0.0f;
+    push.mouseY = 0.0f;
+    push.mousePressed = 0.0f;
+
     vkCmdPushConstants(
         cmd,
         renderer.pipeline.layout,
-        VK_SHADER_STAGE_VERTEX_BIT,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         0,
-        sizeof(float),
-        &currentTime
+        sizeof(PushConstants),
+        &push
     );
 
     //draw the hardcoded triangle
-    vkCmdDraw(cmd, 3, 1, 0, 0);
+    vkCmdDraw(cmd, 3, 1, 0, 0);     
     vkCmdEndRendering(cmd);
 
     transitionImage(

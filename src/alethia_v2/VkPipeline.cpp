@@ -135,7 +135,7 @@ Pipeline createTrianglePipeline(VkDevice device, VkFormat colorFormat, VkFormat 
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(float);
+    pushConstantRange.size = sizeof(PushConstants);
 
     layoutInfo.pushConstantRangeCount = 1;
     layoutInfo.pPushConstantRanges = &pushConstantRange;
