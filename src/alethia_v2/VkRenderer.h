@@ -9,6 +9,7 @@
 #include "VkPhysicalDevice.h"
 #include "VkSwapchain.h"
 #include "VkPipeline.h"
+#include "level_editor/grid/Grid.h"
 
 struct FrameSync{
     VkSemaphore imageAvailable = VK_NULL_HANDLE;
@@ -37,6 +38,7 @@ struct Renderer{
     DepthResources depth{};
     
     Pipeline pipeline{};
+    Grid grid{};
 
     VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
     std::array<VkCommandBuffer, kFramesInFlight> commandBuffers{};

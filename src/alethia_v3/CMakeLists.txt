@@ -39,6 +39,9 @@ add_custom_target(AlethiaV3Shaders DEPENDS ${V3_SPV_FILES})
 # --- Library ---
 add_library(alethia_v3 STATIC
     initv3.cpp
+    AlethiaV3.cpp
+    Vulkan/createInstance.cpp
+    initVulkan.cpp
     # Add your .cpp files here as you create them
 )
 

@@ -5,9 +5,8 @@
 #include <stdexcept>
 #include <GLFW/glfw3.h>
 
-// =============================================
-// V3 Window (renamed to avoid conflict)
-// =============================================
+#include "AlethiaV3.h"
+
 class V3Window {
 public:
     V3Window(int width = 1280, int height = 720,
@@ -38,6 +37,7 @@ V3Window::V3Window(int width, int height, const char* title)
         glfwTerminate();
         throw std::runtime_error("Failed to create GLFW window");
     }
+
 }
 
 V3Window::~V3Window() {
@@ -59,6 +59,9 @@ void initv3() {
     try {
         V3Window window(1280, 720, "Alethia v3");
         std::cout << "GLFW window created successfully.\n";
+
+        AlethiaV3 renderer(window.get());
+        renderer.initVulkan();
 
         while (!window.shouldClose()) {
             window.pollEvents();

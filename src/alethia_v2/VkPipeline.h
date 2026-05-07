@@ -17,6 +17,15 @@ Pipeline createTrianglePipeline(
     const std::string& fragSpvPath
 );
 
+// minimal full-screen pipeline
+Pipeline createFullScreenPipeline(
+    VkDevice device,
+    VkFormat colorFormat,
+    VkFormat depthFormat,
+    const std::string& vertSpvPath,
+    const std::string& fragSpvPath
+);
+
 void destroyPipeline(VkDevice device, Pipeline& pipeline);
 
 // hot-reload helper
@@ -37,3 +46,4 @@ struct PushConstants{
     float mouseY;
     float mousePressed;
 };
+

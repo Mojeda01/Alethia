@@ -14,13 +14,14 @@ layout(push_constant) uniform Push {
 #define iTime push.time
 #define iResolution vec3(push.resolutionX, push.resolutionY, 1.0)
 
-vec3 redPulse(float time) {
-    float r = sin(time) * 0.5 + 0.5;
-    return vec3(r, 0.0, 0.0);
-}
-
 void main() {
-    //vec2 uv = gl_FragCoord.xy / iResolution.xy;
+    // Clean dark background - deep navy/black
+    vec3 color = vec3(0.012, 0.015, 0.025);
 
-    outColor = vec4(redPulse(iTime), 1.0);
+    // Very subtle vignette for depth.
+    vec2 uv = gl_FragCoord.xy / iResolution.xy;
+    float vignette = 1.0 - length(uv - 0.5) * 0.6;
+    color *= vignette * 0.95;
+
+    outColor = vec4(color, 1.0);
 }

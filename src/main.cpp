@@ -1,6 +1,7 @@
 #include "VulkanApp.h"
 #include "SwapchainBundle.h"
 #include "alethia_v2/initv2.h"
+#include "alethia_v3/initv3.h"
 
 #include <iostream>
 
@@ -8,7 +9,8 @@ int main() {
     int version = 0;
     std::cout << "Select engine version:\n";
     std::cout << "  1 - Alethia v1\n";
-    std::cout << "  2 - Alethia v2\n";
+    std::cout << "  2 - Alethia v2 - Broken do not run\n";
+    std::cout << "  3 - Alethia v3\n";
     std::cin >> version;
 
     switch (version) {
@@ -30,6 +32,16 @@ int main() {
                 return 1;
             } 
             break;
+        case 3 : {
+            try {
+                initv3();
+            } catch (const std::exception& e) {
+                std::cerr << e.what() << "\n";
+                return 1;
+            }
+            break;
+        }
+
         default:
             std::cerr << "Invalid selection\n";
             return 1;

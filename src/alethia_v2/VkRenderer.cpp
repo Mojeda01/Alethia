@@ -319,7 +319,10 @@ void recordDrawPass(Renderer& renderer, VkCommandBuffer cmd, uint32_t imageIndex
     );
 
     //draw the hardcoded triangle
-    vkCmdDraw(cmd, 3, 1, 0, 0);     
+    vkCmdDraw(cmd, 3, 1, 0, 0);
+
+    drawGrid(cmd, renderer.grid);
+
     vkCmdEndRendering(cmd);
 
     transitionImage(
@@ -400,6 +403,9 @@ Renderer createRenderer(
 
     try{
         createSwapchainDependentResources(renderer, VK_NULL_HANDLE);
+        renderer.grid = createGrid(logicalDevice.device,
+                                    renderer.swapchain.imageFormat,
+                                    renderer.depth.format);
         for (uint32_t i = 0; i < Renderer::kFramesInFlight; ++i) {
             renderer.frames[i] = createFrameSync(renderer.logicalDevice.device);
         }
@@ -521,6 +527,7 @@ void drawFrame(Renderer& renderer) {
     }
 
     recordDrawPass(renderer, cmd, imageIndex); 
+    drawGrid(cmd, renderer.grid); 
 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
         throw std::runtime_error("vkEndCommandBuffer failed");

@@ -6,6 +6,7 @@ add_library(alethia_v2 STATIC
     VkPipeline.cpp
     VkRenderer.cpp
     VkSwapchain.cpp
+    level_editor/grid/Grid.cpp
 )
 
 target_include_directories(alethia_v2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
